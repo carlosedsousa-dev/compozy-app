@@ -1,0 +1,28 @@
+[tools]
+flutter = "3.50.0-stable"
+java = "21"
+"android:sdk" = "36"
+"android:platform-tools" = "latest"
+"android:build-tools" = "36.0.0"
+"android:cmdline-tools" = "latest"
+"android:emulator" = "latest"
+"android:system-image" = "36"
+
+[plugins]
+"vfox-backend:android" = "https://github.com/mnalmahmud/mise-android"
+
+[env]
+ANDROID_HOME = "{{env.HOME}}/.local/share/mise/android/sdk"
+JAVA_HOME = "{{env.HOME}}/.local/share/mise/installs/java/21.0.13+9.0.LTS"
+
+[tasks.check]
+description = "Gate de qualidade do repositório"
+run = "flutter analyze && flutter test"
+
+[tasks.test]
+description = "Executa os testes unitários e de widget"
+run = "flutter test"
+
+[tasks.build]
+description = "Compila APK de debug"
+run = "flutter build apk --debug"
