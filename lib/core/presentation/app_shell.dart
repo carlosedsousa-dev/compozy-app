@@ -4,6 +4,7 @@ import '../theme/compozy_theme.dart';
 import '../../features/connection/presentation/connection_banner.dart';
 import '../../features/loops/presentation/loops_catalog_screen.dart';
 import '../../features/sessions/presentation/sessions_list_screen.dart';
+import '../../features/settings/presentation/settings_screen.dart';
 
 /// Responsive application shell adapting between mobile (< 600dp)
 /// and tablet/desktop (>= 600dp) environments, strictly mirroring
@@ -36,7 +37,7 @@ class _AppNavigationShellState extends State<AppNavigationShell> {
       case 1:
         return const LoopsCatalogScreen();
       case 2:
-        return const _PlaceholderView(title: 'Daemon Settings');
+        return const SettingsScreen();
       default:
         return const SessionsListScreen();
     }
