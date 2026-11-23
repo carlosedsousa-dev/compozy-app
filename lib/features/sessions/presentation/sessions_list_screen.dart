@@ -9,7 +9,7 @@ import 'session_chat_screen.dart';
 import 'widgets/session_badges.dart';
 
 /// Screen displaying the list of active/idle/stopped CompozyOS sessions
-/// with filtering chips and pull-to-refresh.
+/// strictly styled after board.jpg and hero.jpg.
 class SessionsListScreen extends ConsumerWidget {
   final ValueChanged<Session>? onSessionTap;
 
@@ -28,7 +28,7 @@ class SessionsListScreen extends ConsumerWidget {
       backgroundColor: CompozyColors.desk,
       body: Column(
         children: [
-          // If offline, display connection banner
+          // Connection banner if offline
           if (!isOnline)
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -43,7 +43,7 @@ class SessionsListScreen extends ConsumerWidget {
             child: RefreshIndicator(
               key: const Key('sessions_refresh_indicator'),
               color: CompozyColors.fgStrong,
-              backgroundColor: CompozyColors.surface2,
+              backgroundColor: CompozyColors.elevated,
               onRefresh: () async {
                 ref.invalidate(sessionsProvider);
                 await ref.read(sessionsProvider.future);
@@ -51,6 +51,7 @@ class SessionsListScreen extends ConsumerWidget {
               child: filteredAsync.when(
                 loading: () => const Center(
                   child: CircularProgressIndicator(
+                    strokeWidth: 2,
                     color: CompozyColors.fg,
                   ),
                 ),
@@ -78,7 +79,7 @@ class SessionsListScreen extends ConsumerWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
@@ -93,17 +94,21 @@ class SessionsListScreen extends ConsumerWidget {
                 label: Text(filter),
                 selected: isSelected,
                 selectedColor: CompozyColors.elevated,
-                backgroundColor: CompozyColors.surface2,
+                backgroundColor: CompozyColors.card,
                 side: BorderSide(
                   color: isSelected
                       ? CompozyColors.lineStrong
                       : CompozyColors.line,
+                  width: 1,
+                ),
+                shape: const RoundedRectangleBorder(
+                  borderRadius: CompozyRadius.pill,
                 ),
                 labelStyle: TextStyle(
                   color: isSelected
                       ? CompozyColors.fgStrong
                       : CompozyColors.muted,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                   fontSize: 13,
                 ),
                 onSelected: (selected) {
@@ -161,7 +166,7 @@ class SessionsListScreen extends ConsumerWidget {
                   children: const [
                     Icon(
                       Icons.chat_bubble_outline,
-                      size: 48,
+                      size: 44,
                       color: CompozyColors.muted,
                     ),
                     SizedBox(height: 16),
@@ -207,10 +212,10 @@ class SessionsListScreen extends ConsumerWidget {
                   children: [
                     const Icon(
                       Icons.error_outline,
-                      size: 48,
+                      size: 44,
                       color: CompozyColors.danger,
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: 16),
                     const Text(
                       'Failed to load sessions',
                       style: TextStyle(
@@ -229,16 +234,28 @@ class SessionsListScreen extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    OutlinedButton(
+                    // Monochrome inverted primary action button
+                    ElevatedButton(
                       onPressed: () => ref.invalidate(sessionsProvider),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: CompozyColors.fg,
-                        side: const BorderSide(color: CompozyColors.line),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: CompozyColors.primary,
+                        foregroundColor: CompozyColors.primaryInk,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 10,
+                        ),
                         shape: const RoundedRectangleBorder(
                           borderRadius: CompozyRadius.pill,
                         ),
                       ),
-                      child: const Text('Retry'),
+                      child: const Text(
+                        'Retry',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -251,7 +268,7 @@ class SessionsListScreen extends ConsumerWidget {
   }
 }
 
-/// Visual card representing one session in the list.
+/// Visual card representing one session in the list, strictly mirroring board.jpg.
 class _SessionCard extends StatelessWidget {
   final Session session;
   final VoidCallback? onTap;
@@ -266,7 +283,7 @@ class _SessionCard extends StatelessWidget {
     return Container(
       key: Key('session_card_${session.id}'),
       decoration: BoxDecoration(
-        color: CompozyColors.canvas,
+        color: CompozyColors.card,
         borderRadius: CompozyRadius.card,
         border: Border.all(color: CompozyColors.line, width: 1),
       ),
@@ -276,33 +293,52 @@ class _SessionCard extends StatelessWidget {
           borderRadius: CompozyRadius.card,
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header: Session name + State badge
+                // Top Header: Context tag + State badge
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Expanded(
                       child: Text(
-                        session.name,
+                        session.id,
                         style: const TextStyle(
-                          color: CompozyColors.fgStrong,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
+                          color: CompozyColors.subtle,
+                          fontSize: 11,
+                          fontFamily: 'monospace',
                         ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(width: 8),
                     StateBadge(state: session.state),
                   ],
                 ),
+                const SizedBox(height: 8),
+
+                // Main Title: Session Name in high contrast
+                Text(
+                  session.name,
+                  style: const TextStyle(
+                    color: CompozyColors.fgStrong,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.1,
+                  ),
+                ),
                 const SizedBox(height: 12),
 
-                // Subtitle: Agent pill + Relative time
+                // Bottom Footer: Agent Avatar + Agent pill + Relative timestamp
                 Row(
                   children: [
+                    AgentAvatar(
+                      agent: session.agent,
+                      state: session.state,
+                      size: 22,
+                    ),
+                    const SizedBox(width: 8),
                     AgentBadge(agent: session.agent),
                     const Spacer(),
                     Text(
@@ -310,6 +346,7 @@ class _SessionCard extends StatelessWidget {
                       style: const TextStyle(
                         color: CompozyColors.muted,
                         fontSize: 12,
+                        fontWeight: FontWeight.w400,
                       ),
                     ),
                   ],

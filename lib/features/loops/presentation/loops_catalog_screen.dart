@@ -7,7 +7,8 @@ import '../data/loop_repository_impl.dart';
 import '../domain/loop_definition.dart';
 
 /// Screen displaying the catalog of available workspace Loops with
-/// category filtering, contract inspection, and responsive layout.
+/// category filtering, contract inspection, and responsive layout,
+/// strictly mirroring loops.jpg and automations.jpg.
 class LoopsCatalogScreen extends ConsumerWidget {
   final ValueChanged<LoopDefinition>? onLoopTap;
 
@@ -52,7 +53,7 @@ class LoopsCatalogScreen extends ConsumerWidget {
             child: RefreshIndicator(
               key: const Key('loops_refresh_indicator'),
               color: CompozyColors.fgStrong,
-              backgroundColor: CompozyColors.surface2,
+              backgroundColor: CompozyColors.elevated,
               onRefresh: () async {
                 ref.invalidate(loopsProvider);
                 await ref.read(loopsProvider.future);
@@ -60,6 +61,7 @@ class LoopsCatalogScreen extends ConsumerWidget {
               child: filteredAsync.when(
                 loading: () => const Center(
                   child: CircularProgressIndicator(
+                    strokeWidth: 2,
                     color: CompozyColors.fg,
                   ),
                 ),
@@ -92,15 +94,17 @@ class LoopsCatalogScreen extends ConsumerWidget {
               color: CompozyColors.fgStrong,
               fontSize: 16,
               fontWeight: FontWeight.w600,
+              letterSpacing: -0.1,
             ),
           ),
           const SizedBox(width: 8),
           loopsAsync.maybeWhen(
             data: (loops) => Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: const BoxDecoration(
-                color: CompozyColors.surface2,
+              decoration: BoxDecoration(
+                color: CompozyColors.elevated,
                 borderRadius: CompozyRadius.pill,
+                border: Border.all(color: CompozyColors.line, width: 1),
               ),
               child: Text(
                 '${loops.length}',
@@ -148,17 +152,21 @@ class LoopsCatalogScreen extends ConsumerWidget {
                 label: Text(category),
                 selected: isSelected,
                 selectedColor: CompozyColors.elevated,
-                backgroundColor: CompozyColors.surface2,
+                backgroundColor: CompozyColors.card,
                 side: BorderSide(
                   color: isSelected
                       ? CompozyColors.lineStrong
                       : CompozyColors.line,
+                  width: 1,
+                ),
+                shape: const RoundedRectangleBorder(
+                  borderRadius: CompozyRadius.pill,
                 ),
                 labelStyle: TextStyle(
                   color: isSelected
                       ? CompozyColors.fgStrong
                       : CompozyColors.muted,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                   fontSize: 13,
                 ),
                 onSelected: (selected) {
@@ -226,7 +234,7 @@ class LoopsCatalogScreen extends ConsumerWidget {
     } else {
       showModalBottomSheet<void>(
         context: context,
-        backgroundColor: CompozyColors.canvas,
+        backgroundColor: CompozyColors.card,
         isScrollControlled: true,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -252,7 +260,7 @@ class LoopsCatalogScreen extends ConsumerWidget {
                   children: const [
                     Icon(
                       Icons.all_inclusive,
-                      size: 48,
+                      size: 44,
                       color: CompozyColors.muted,
                     ),
                     SizedBox(height: 16),
@@ -299,7 +307,7 @@ class LoopsCatalogScreen extends ConsumerWidget {
                   children: [
                     const Icon(
                       Icons.error_outline,
-                      size: 48,
+                      size: 44,
                       color: CompozyColors.danger,
                     ),
                     const SizedBox(height: 16),
@@ -321,16 +329,21 @@ class LoopsCatalogScreen extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    OutlinedButton(
+                    ElevatedButton(
                       onPressed: () => ref.invalidate(loopsProvider),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: CompozyColors.fg,
-                        side: const BorderSide(color: CompozyColors.line),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: CompozyColors.primary,
+                        foregroundColor: CompozyColors.primaryInk,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                         shape: const RoundedRectangleBorder(
                           borderRadius: CompozyRadius.pill,
                         ),
                       ),
-                      child: const Text('Retry'),
+                      child: const Text(
+                        'Retry',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
                     ),
                   ],
                 ),
@@ -343,7 +356,7 @@ class LoopsCatalogScreen extends ConsumerWidget {
   }
 }
 
-/// Visual card representing one Loop definition in the catalog.
+/// Visual card representing one Loop definition in the catalog, strictly mirroring loops.jpg.
 class _LoopCard extends StatelessWidget {
   final LoopDefinition loop;
   final VoidCallback onTap;
@@ -358,7 +371,7 @@ class _LoopCard extends StatelessWidget {
     return Container(
       key: Key('loop_card_${loop.name}'),
       decoration: BoxDecoration(
-        color: CompozyColors.canvas,
+        color: CompozyColors.card,
         borderRadius: CompozyRadius.card,
         border: Border.all(color: CompozyColors.line, width: 1),
       ),
@@ -383,6 +396,7 @@ class _LoopCard extends StatelessWidget {
                           color: CompozyColors.fgStrong,
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
+                          letterSpacing: -0.1,
                         ),
                       ),
                     ),
@@ -401,14 +415,14 @@ class _LoopCard extends StatelessWidget {
                   style: const TextStyle(
                     color: CompozyColors.fg,
                     fontSize: 13,
-                    height: 1.35,
+                    height: 1.4,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 12),
 
-                // Footer metadata row
+                // Footer metadata row (mirrors loops.jpg)
                 Row(
                   children: [
                     Expanded(
@@ -427,7 +441,7 @@ class _LoopCard extends StatelessWidget {
                                   color: CompozyColors.surface2,
                                   borderRadius: CompozyRadius.pill,
                                   border: Border.all(
-                                    color: CompozyColors.lineSoft,
+                                    color: CompozyColors.line,
                                     width: 1,
                                   ),
                                 ),
@@ -452,7 +466,7 @@ class _LoopCard extends StatelessWidget {
                                   color: CompozyColors.surface2,
                                   borderRadius: CompozyRadius.pill,
                                   border: Border.all(
-                                    color: CompozyColors.lineSoft,
+                                    color: CompozyColors.line,
                                     width: 1,
                                   ),
                                 ),
@@ -484,7 +498,7 @@ class _LoopCard extends StatelessWidget {
                     const Icon(
                       Icons.chevron_right,
                       size: 18,
-                      color: CompozyColors.muted,
+                      color: CompozyColors.subtle,
                     ),
                   ],
                 ),
@@ -497,7 +511,7 @@ class _LoopCard extends StatelessWidget {
   }
 }
 
-/// Category pill badge for loop classification.
+/// Category pill badge for loop classification with subtle slate/violet tone.
 class _CategoryBadge extends StatelessWidget {
   final String category;
   final String? loopName;
@@ -522,7 +536,7 @@ class _CategoryBadge extends StatelessWidget {
         children: [
           const Icon(
             Icons.folder_outlined,
-            size: 12,
+            size: 11,
             color: CompozyColors.info,
           ),
           const SizedBox(width: 4),
@@ -558,7 +572,7 @@ class LoopDetailsSheet extends StatelessWidget {
         maxHeight: MediaQuery.of(context).size.height * 0.85,
       ),
       decoration: const BoxDecoration(
-        color: CompozyColors.canvas,
+        color: CompozyColors.card,
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
         border: Border(
           top: BorderSide(color: CompozyColors.line, width: 1),
@@ -675,7 +689,7 @@ class LoopDetailsSheet extends StatelessWidget {
           children: const [
             Icon(
               Icons.assignment_outlined,
-              size: 15,
+              size: 14,
               color: CompozyColors.info,
             ),
             SizedBox(width: 6),
@@ -773,7 +787,7 @@ class LoopDetailsSheet extends StatelessWidget {
       children: [
         Row(
           children: const [
-            Icon(Icons.input_outlined, size: 15, color: CompozyColors.info),
+            Icon(Icons.input_outlined, size: 14, color: CompozyColors.info),
             SizedBox(width: 6),
             Text(
               'INPUT SCHEMA',

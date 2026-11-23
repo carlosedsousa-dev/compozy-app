@@ -2,10 +2,11 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/theme/compozy_theme.dart';
 import '../../domain/models/turn.dart';
+import 'session_badges.dart';
 
 /// User chat bubble strictly styled with Compozy tokens:
-/// Right-aligned, `#242424` background, border `1px solid #303030`,
-/// radius `12px`, text `--fg: #F5F5F5`.
+/// Right-aligned, `#232323` background, border `1px solid #2E2E2E`,
+/// radius `16px` with bottom-right `4px` (mirrors hero.jpg and REFERENCE_GUIDE.md).
 class UserChatBubble extends StatelessWidget {
   final String message;
   final String? status;
@@ -29,10 +30,17 @@ class UserChatBubble extends StatelessWidget {
         child: Container(
           key: turnId != null ? Key('user_bubble_$turnId') : null,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: CompozyColors.surface2,
-            border: Border.all(color: CompozyColors.line, width: 1),
-            borderRadius: CompozyRadius.card,
+          decoration: const BoxDecoration(
+            color: CompozyColors.elevated,
+            border: Border.fromBorderSide(
+              BorderSide(color: Color(0xFF2E2E2E), width: 1),
+            ),
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(16),
+              topRight: Radius.circular(16),
+              bottomLeft: Radius.circular(16),
+              bottomRight: Radius.circular(4),
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -79,8 +87,8 @@ class UserChatBubble extends StatelessWidget {
 }
 
 /// Agent chat bubble strictly styled with Compozy tokens:
-/// Left-aligned, `#1A1A1A` background, border `1px solid #303030`,
-/// radius `12px`, with markdown rendering.
+/// Left-aligned, includes circular agent avatar on the left, `#161616` container,
+/// border `1px solid #262626`, radius `14px` (mirrors hero.jpg and handoff.jpg).
 class AgentChatBubble extends StatelessWidget {
   final String message;
   final String? turnId;
@@ -95,21 +103,45 @@ class AgentChatBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final effectiveAgent = agentName ?? 'agent';
+
     return Align(
       alignment: Alignment.centerLeft,
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.85,
+          maxWidth: MediaQuery.of(context).size.width * 0.90,
         ),
-        child: Container(
-          key: turnId != null ? Key('agent_bubble_$turnId') : null,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: CompozyColors.canvas,
-            border: Border.all(color: CompozyColors.line, width: 1),
-            borderRadius: CompozyRadius.card,
-          ),
-          child: MarkdownView(text: message),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Circular agent avatar (mirrors hero.jpg)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: AgentAvatar(agent: effectiveAgent, size: 24),
+            ),
+            const SizedBox(width: 8),
+
+            // Message container with markdown
+            Expanded(
+              child: Container(
+                key: turnId != null ? Key('agent_bubble_$turnId') : null,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: const BoxDecoration(
+                  color: CompozyColors.card,
+                  border: Border.fromBorderSide(
+                    BorderSide(color: CompozyColors.line, width: 1),
+                  ),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(4),
+                    topRight: Radius.circular(16),
+                    bottomLeft: Radius.circular(16),
+                    bottomRight: Radius.circular(16),
+                  ),
+                ),
+                child: MarkdownView(text: message),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -352,7 +384,7 @@ class MarkdownView extends StatelessWidget {
 }
 
 /// Collapsible tool execution pill widget strictly styled with Compozy tokens:
-/// Monospace font, sunken fill (`#101010`), and 1px line border.
+/// Monospace font, sunken surface (`#141414`), and 1px line border (mirrors handoff.jpg).
 class ToolInvocationPills extends StatefulWidget {
   final List<String> toolCalls;
   final String turnId;
@@ -394,7 +426,7 @@ class _ToolInvocationPillsState extends State<ToolInvocationPills> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: CompozyColors.desk,
+                color: const Color(0xFF141414),
                 borderRadius: CompozyRadius.pill,
                 border: Border.all(color: CompozyColors.line, width: 1),
               ),
@@ -432,7 +464,7 @@ class _ToolInvocationPillsState extends State<ToolInvocationPills> {
           if (_isExpanded) ...[
             const SizedBox(height: 6),
             Padding(
-              padding: const EdgeInsets.only(left: 6),
+              padding: const EdgeInsets.only(left: 4),
               child: Wrap(
                 spacing: 6,
                 runSpacing: 6,
@@ -441,7 +473,7 @@ class _ToolInvocationPillsState extends State<ToolInvocationPills> {
                     key: Key('tool_call_${widget.turnId}_$tool'),
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: CompozyColors.desk,
+                      color: CompozyColors.card,
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(color: CompozyColors.line, width: 1),
                     ),

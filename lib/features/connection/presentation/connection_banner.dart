@@ -59,7 +59,7 @@ class ConnectionBanner extends ConsumerWidget {
       key: Key(online ? 'connection_pill_online' : 'connection_pill_offline'),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: CompozyColors.surface2,
+        color: CompozyColors.card,
         borderRadius: CompozyRadius.pill,
         border: Border.all(color: CompozyColors.line, width: 1),
       ),
@@ -94,7 +94,7 @@ class ConnectionBanner extends ConsumerWidget {
         key: const Key('connection_banner_online'),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: CompozyColors.surface2,
+          color: CompozyColors.card,
           borderRadius: CompozyRadius.input,
           border: Border.all(color: CompozyColors.line, width: 1),
         ),
@@ -137,7 +137,7 @@ class ConnectionBanner extends ConsumerWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: CompozyColors.canvas,
+        color: CompozyColors.card,
         borderRadius: CompozyRadius.input,
         border: Border.all(color: CompozyColors.danger, width: 1),
       ),
@@ -190,7 +190,7 @@ class ConnectionBanner extends ConsumerWidget {
             ),
           ),
           const SizedBox(width: 8),
-          TextButton(
+          ElevatedButton(
             key: const Key('connection_retry_button'),
             onPressed: () {
               if (onRetry != null) {
@@ -198,13 +198,13 @@ class ConnectionBanner extends ConsumerWidget {
               }
               ref.invalidate(connectionStatusProvider);
             },
-            style: TextButton.styleFrom(
-              foregroundColor: CompozyColors.fgStrong,
-              backgroundColor: CompozyColors.surface2,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: CompozyColors.primary,
+              foregroundColor: CompozyColors.primaryInk,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               shape: const RoundedRectangleBorder(
                 borderRadius: CompozyRadius.pill,
-                side: BorderSide(color: CompozyColors.line),
               ),
             ),
             child: const Text(

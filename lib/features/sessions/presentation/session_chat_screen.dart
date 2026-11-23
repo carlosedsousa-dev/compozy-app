@@ -10,7 +10,8 @@ import 'widgets/chat_bubble.dart';
 import 'widgets/session_badges.dart';
 
 /// Screen displaying the conversation turn transcript for a CompozyOS session,
-/// collapsible tool execution pills, and an interactive prompt input bar.
+/// collapsible tool execution pills, and an interactive prompt input container,
+/// strictly mirroring hero.jpg, handoff.jpg, and REFERENCE_GUIDE.md.
 class SessionChatScreen extends ConsumerStatefulWidget {
   final Session session;
   final List<Turn>? initialTurns;
@@ -176,6 +177,7 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
                 : historyAsync.when(
                     loading: () => const Center(
                       child: CircularProgressIndicator(
+                        strokeWidth: 2,
                         color: CompozyColors.fg,
                       ),
                     ),
@@ -184,7 +186,7 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
                   ),
           ),
 
-          // Docked prompt input bar
+          // Docked prompt input bar container (mirrors hero.jpg)
           _buildPromptInputBar(),
         ],
       ),
@@ -196,9 +198,9 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
       preferredSize: const Size.fromHeight(52),
       child: Container(
         decoration: const BoxDecoration(
-          color: CompozyColors.rail,
+          color: CompozyColors.canvas,
           border: Border(
-            bottom: BorderSide(color: CompozyColors.line, width: 1),
+            bottom: BorderSide(color: Color(0xFF202020), width: 1),
           ),
         ),
         child: AppBar(
@@ -207,7 +209,7 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
           elevation: 0,
           leading: IconButton(
             key: const Key('chat_back_button'),
-            icon: const Icon(Icons.arrow_back, color: CompozyColors.fg),
+            icon: const Icon(Icons.arrow_back, color: CompozyColors.fg, size: 20),
             onPressed: () => Navigator.of(context).maybePop(),
           ),
           titleSpacing: 0,
@@ -252,7 +254,7 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
       ),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: color),
+          Icon(icon, size: 15, color: color),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -275,7 +277,7 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
     return RefreshIndicator(
       key: const Key('chat_refresh_indicator'),
       color: CompozyColors.fgStrong,
-      backgroundColor: CompozyColors.surface2,
+      backgroundColor: CompozyColors.elevated,
       onRefresh: () async {
         ref.invalidate(sessionHistoryProvider(widget.session.id));
         await ref.read(sessionHistoryProvider(widget.session.id).future);
@@ -315,7 +317,7 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
                   children: const [
                     Icon(
                       Icons.chat_bubble_outline,
-                      size: 48,
+                      size: 44,
                       color: CompozyColors.muted,
                     ),
                     SizedBox(height: 16),
@@ -361,7 +363,7 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
                   children: [
                     const Icon(
                       Icons.error_outline,
-                      size: 48,
+                      size: 44,
                       color: CompozyColors.danger,
                     ),
                     const SizedBox(height: 16),
@@ -383,16 +385,21 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    OutlinedButton(
+                    ElevatedButton(
                       onPressed: () => ref.invalidate(sessionHistoryProvider(widget.session.id)),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: CompozyColors.fg,
-                        side: const BorderSide(color: CompozyColors.line),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: CompozyColors.primary,
+                        foregroundColor: CompozyColors.primaryInk,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                         shape: const RoundedRectangleBorder(
                           borderRadius: CompozyRadius.pill,
                         ),
                       ),
-                      child: const Text('Retry'),
+                      child: const Text(
+                        'Retry',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
                     ),
                   ],
                 ),
@@ -409,61 +416,92 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
 
     return Container(
       decoration: const BoxDecoration(
-        color: CompozyColors.rail,
+        color: CompozyColors.canvas,
         border: Border(
-          top: BorderSide(color: CompozyColors.line, width: 1),
+          top: BorderSide(color: Color(0xFF202020), width: 1),
         ),
       ),
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
       child: SafeArea(
         top: false,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            // Input field
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: CompozyColors.canvas,
-                  borderRadius: CompozyRadius.input,
-                  border: Border.all(
-                    color: isInputEnabled ? CompozyColors.line : CompozyColors.lineSoft,
-                    width: 1,
-                  ),
+        child: Container(
+          decoration: BoxDecoration(
+            color: CompozyColors.card,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isInputEnabled ? CompozyColors.line : CompozyColors.lineSoft,
+              width: 1,
+            ),
+          ),
+          padding: const EdgeInsets.fromLTRB(14, 8, 10, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Prompt TextField
+              TextField(
+                key: const Key('prompt_input_field'),
+                controller: _promptController,
+                enabled: isInputEnabled,
+                minLines: 1,
+                maxLines: 4,
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) => _sendPrompt(),
+                style: const TextStyle(
+                  color: CompozyColors.fg,
+                  fontSize: 14,
                 ),
-                child: TextField(
-                  key: const Key('prompt_input_field'),
-                  controller: _promptController,
-                  enabled: isInputEnabled,
-                  minLines: 1,
-                  maxLines: 4,
-                  textInputAction: TextInputAction.send,
-                  onSubmitted: (_) => _sendPrompt(),
-                  style: const TextStyle(
-                    color: CompozyColors.fg,
+                cursorColor: CompozyColors.fgStrong,
+                decoration: InputDecoration(
+                  hintText: _isSessionStopped
+                      ? 'Session is stopped'
+                      : (_isSessionBusy ? 'Session is busy...' : 'Send a prompt to agent...'),
+                  hintStyle: const TextStyle(
+                    color: CompozyColors.subtle,
                     fontSize: 14,
                   ),
-                  cursorColor: CompozyColors.fgStrong,
-                  decoration: InputDecoration(
-                    hintText: _isSessionStopped
-                        ? 'Session is stopped'
-                        : (_isSessionBusy ? 'Session is busy...' : 'Send a prompt to agent...'),
-                    hintStyle: const TextStyle(
-                      color: CompozyColors.subtle,
-                      fontSize: 14,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    border: InputBorder.none,
-                    isDense: true,
-                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 4),
+                  border: InputBorder.none,
+                  isDense: true,
                 ),
               ),
-            ),
-            const SizedBox(width: 10),
+              const SizedBox(height: 8),
 
-            // Inverted primary send pill
-            _buildSendButton(),
-          ],
+              // Bottom control bar (mirrors hero.jpg)
+              Row(
+                children: [
+                  // Tool/capability indicator chips
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: CompozyColors.surface2,
+                      borderRadius: CompozyRadius.pill,
+                      border: Border.all(color: CompozyColors.line, width: 1),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(
+                          Icons.auto_awesome,
+                          size: 12,
+                          color: CompozyColors.info,
+                        ),
+                        SizedBox(width: 5),
+                        Icon(
+                          Icons.terminal,
+                          size: 12,
+                          color: CompozyColors.muted,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Spacer(),
+
+                  // Inverted primary send button (strictly monochrome #F5F5F5 / #0A0A0A)
+                  _buildSendButton(),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -473,8 +511,8 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
     final isEnabled = _canSend;
 
     return Container(
-      width: 40,
-      height: 40,
+      width: 32,
+      height: 32,
       decoration: BoxDecoration(
         color: isEnabled ? CompozyColors.primary : CompozyColors.surface2,
         borderRadius: CompozyRadius.pill,
@@ -492,8 +530,8 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
           child: Center(
             child: _isSubmitting
                 ? const SizedBox(
-                    width: 16,
-                    height: 16,
+                    width: 14,
+                    height: 14,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
                       color: CompozyColors.primaryInk,
@@ -501,7 +539,7 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
                   )
                 : Icon(
                     Icons.arrow_upward,
-                    size: 20,
+                    size: 17,
                     color: isEnabled
                         ? CompozyColors.primaryInk
                         : CompozyColors.subtle,
