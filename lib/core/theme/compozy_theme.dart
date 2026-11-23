@@ -1,6 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
-/// Canonical CompozyOS Design System color tokens.
+/// Canonical CompozyOS Design System color tokens (Dark Mode).
 /// Pure chroma-free neutral dark palette, inverted monochrome primary actions,
 /// and semantic signal palette (strictly aligned with ds-core.css / reference images).
 class CompozyColors {
@@ -40,6 +40,47 @@ class CompozyColors {
   static const Color warning = Color(0xFFF5B14C); // Amber (Waiting/busy, degraded)
   static const Color danger = Color(0xFFF87171);  // Rose / Red (Stopped, failed, disconnected)
   static const Color info = Color(0xFF8E8EB5);    // Slate / Violet (Category / Agent info)
+}
+
+/// Canonical CompozyOS Design System Light Mode color tokens (tokens-light.css / lockup-light.png).
+/// Pure chroma-free neutral light palette, inverted monochrome primary actions (#0A0A0A on #FFFFFF),
+/// and semantic signal palette.
+class CompozyColorsLight {
+  const CompozyColorsLight._();
+
+  // Canonical Surfaces
+  static const Color canvas = Color(0xFFFFFFFF);     // Pure white canvas background (#FFFFFF)
+  static const Color rail = Color(0xFFFAFAFA);       // Navigation rail / top app bar
+  static const Color desk = Color(0xFFF4F4F5);       // Secondary surface / workspace desk (#F4F4F5)
+  static const Color card = Color(0xFFFFFFFF);       // Cards & containers (#FFFFFF)
+  static const Color canvasSoft = Color(0xFFF4F4F5); // Soft container surface
+  static const Color surface2 = Color(0xFFEFEFEF);   // Sub-elements, chips, input background
+  static const Color elevated = Color(0xFFE4E4E7);   // Elevated pills, hover, chat bubble
+
+  // Lines & Borders (1px solid canonical line)
+  static const Color line = Color(0xFFE4E4E7);       // Canonical border (#E4E4E7, 1px solid)
+  static const Color lineSoft = Color(0xFFF0F0F0);   // Subtle divider
+  static const Color lineStrong = Color(0xFFD4D4D8); // Highlighted / selected border
+
+  // Typography & Text Ladder
+  static const Color fgStrong = Color(0xFF0A0A0A);
+  static const Color fg = Color(0xFF18181B);
+  static const Color muted = Color(0xFF71717A);
+  static const Color subtle = Color(0xFFA1A1AA);
+
+  // Actions & Accents
+  // Primary action: STRICTLY inverted monochrome pill (#0A0A0A bg, #FFFFFF text in light mode). NEVER orange.
+  static const Color primary = Color(0xFF0A0A0A);
+  static const Color primaryInk = Color(0xFFFFFFFF);
+
+  // Accent: RESERVED EXCLUSIVELY for attention and urgency ("Needs you" badge/dot, unread alerts).
+  static const Color accent = Color(0xFFE8572A);
+
+  // Semantic Signal Palette (Status)
+  static const Color success = Color(0xFF059669); // Emerald / Green (Working, active, healthy)
+  static const Color warning = Color(0xFFD97706); // Amber (Waiting/busy, degraded)
+  static const Color danger = Color(0xFFDC2626);  // Red (Stopped, failed, disconnected)
+  static const Color info = Color(0xFF6366F1);    // Slate / Violet (Category / Agent info)
 }
 
 /// Canonical CompozyOS Geometry & Radius tokens.
@@ -154,6 +195,106 @@ class CompozyTheme {
         ),
         bodySmall: TextStyle(
           color: CompozyColors.muted,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+
+  /// Light Theme adhering to tokens-light.css / lockup-light.png.
+  static ThemeData get lightTheme {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      scaffoldBackgroundColor: CompozyColorsLight.desk,
+      canvasColor: CompozyColorsLight.canvas,
+      colorScheme: const ColorScheme.light(
+        surface: CompozyColorsLight.card,
+        onSurface: CompozyColorsLight.fg,
+        primary: CompozyColorsLight.primary,
+        onPrimary: CompozyColorsLight.primaryInk,
+        secondary: CompozyColorsLight.elevated,
+        onSecondary: CompozyColorsLight.fg,
+        error: CompozyColorsLight.danger,
+        onError: CompozyColorsLight.primaryInk,
+        outline: CompozyColorsLight.line,
+      ),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: CompozyColorsLight.canvas,
+        foregroundColor: CompozyColorsLight.fgStrong,
+        elevation: 0,
+        centerTitle: false,
+        titleTextStyle: TextStyle(
+          color: CompozyColorsLight.fgStrong,
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          fontFamily: 'Inter',
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: CompozyColorsLight.card,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: CompozyRadius.card,
+          side: const BorderSide(color: CompozyColorsLight.line, width: 1),
+        ),
+        margin: EdgeInsets.zero,
+      ),
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: CompozyColorsLight.canvas,
+        selectedItemColor: CompozyColorsLight.fgStrong,
+        unselectedItemColor: CompozyColorsLight.subtle,
+        elevation: 0,
+        type: BottomNavigationBarType.fixed,
+      ),
+      navigationRailTheme: const NavigationRailThemeData(
+        backgroundColor: CompozyColorsLight.canvas,
+        selectedIconTheme: IconThemeData(color: CompozyColorsLight.fgStrong),
+        unselectedIconTheme: IconThemeData(color: CompozyColorsLight.subtle),
+        selectedLabelTextStyle: TextStyle(
+          color: CompozyColorsLight.fgStrong,
+          fontWeight: FontWeight.w600,
+          fontSize: 12,
+        ),
+        unselectedLabelTextStyle: TextStyle(
+          color: CompozyColorsLight.muted,
+          fontSize: 12,
+        ),
+        indicatorColor: CompozyColorsLight.elevated,
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: CompozyColorsLight.card,
+        selectedColor: CompozyColorsLight.elevated,
+        labelStyle: const TextStyle(color: CompozyColorsLight.muted, fontSize: 13),
+        secondaryLabelStyle: const TextStyle(
+          color: CompozyColorsLight.fgStrong,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
+        side: const BorderSide(color: CompozyColorsLight.line, width: 1),
+        shape: const RoundedRectangleBorder(borderRadius: CompozyRadius.pill),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      ),
+      dividerTheme: const DividerThemeData(
+        color: CompozyColorsLight.line,
+        thickness: 1,
+        space: 1,
+      ),
+      textTheme: const TextTheme(
+        headlineMedium: TextStyle(
+          color: CompozyColorsLight.fgStrong,
+          fontWeight: FontWeight.w700,
+        ),
+        titleMedium: TextStyle(
+          color: CompozyColorsLight.fgStrong,
+          fontWeight: FontWeight.w600,
+        ),
+        bodyMedium: TextStyle(
+          color: CompozyColorsLight.fg,
+          fontSize: 14,
+        ),
+        bodySmall: TextStyle(
+          color: CompozyColorsLight.muted,
           fontSize: 12,
         ),
       ),

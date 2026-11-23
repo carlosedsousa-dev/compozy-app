@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../theme/compozy_theme.dart';
+import '../theme/theme_mode_toggle.dart';
 import '../../features/connection/presentation/connection_banner.dart';
 import '../../features/loops/presentation/loops_catalog_screen.dart';
 import '../../features/sessions/presentation/sessions_list_screen.dart';
@@ -8,7 +9,7 @@ import '../../features/settings/presentation/settings_screen.dart';
 
 /// Responsive application shell adapting between mobile (< 600dp)
 /// and tablet/desktop (>= 600dp) environments, strictly mirroring
-/// CompozyOS visual guidelines (lockup-dark.png, hero.jpg, board.jpg).
+/// CompozyOS visual guidelines (lockup-dark.png, lockup-light.png, hero.jpg, board.jpg).
 class AppNavigationShell extends StatefulWidget {
   final String workspaceName;
 
@@ -59,24 +60,30 @@ class _AppNavigationShellState extends State<AppNavigationShell> {
   }
 
   PreferredSizeWidget _buildTopAppBar() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final canvasColor = isDark ? CompozyColors.canvas : CompozyColorsLight.canvas;
+    final borderColor = isDark ? const Color(0xFF202020) : CompozyColorsLight.line;
+    final fgStrong = isDark ? CompozyColors.fgStrong : CompozyColorsLight.fgStrong;
+    final muted = isDark ? CompozyColors.muted : CompozyColorsLight.muted;
+
     return PreferredSize(
       preferredSize: const Size.fromHeight(52),
       child: Container(
-        decoration: const BoxDecoration(
-          color: CompozyColors.canvas,
+        decoration: BoxDecoration(
+          color: canvasColor,
           border: Border(
-            bottom: BorderSide(color: Color(0xFF202020), width: 1),
+            bottom: BorderSide(color: borderColor, width: 1),
           ),
         ),
         child: AppBar(
           toolbarHeight: 52,
           backgroundColor: Colors.transparent,
           elevation: 0,
-          titleSpacing: 16,
+          titleSpacing: 12,
           title: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // CompozyOS Brand Glyph (mirrors lockup-dark.png)
+              // CompozyOS Brand Glyph (mirrors lockup-dark.png / lockup-light.png)
               Container(
                 width: 20,
                 height: 20,
@@ -94,34 +101,38 @@ class _AppNavigationShellState extends State<AppNavigationShell> {
                   child: Container(
                     width: 9,
                     height: 9,
-                    decoration: const BoxDecoration(
-                      color: CompozyColors.canvas,
+                    decoration: BoxDecoration(
+                      color: canvasColor,
                       shape: BoxShape.circle,
                     ),
                   ),
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
-                widget.workspaceName,
-                style: const TextStyle(
-                  color: CompozyColors.fgStrong,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: -0.2,
+              Flexible(
+                child: Text(
+                  widget.workspaceName,
+                  style: TextStyle(
+                    color: fgStrong,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.2,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               const SizedBox(width: 4),
-              const Icon(
+              Icon(
                 Icons.keyboard_arrow_down,
                 size: 16,
-                color: CompozyColors.muted,
+                color: muted,
               ),
             ],
           ),
           actions: const [
+            ThemeModeToggle(key: Key('app_shell_theme_toggle')),
             Padding(
-              padding: EdgeInsets.only(right: 16),
+              padding: EdgeInsets.only(right: 12),
               child: Center(
                 child: ConnectionBanner.compact(),
               ),
@@ -133,25 +144,32 @@ class _AppNavigationShellState extends State<AppNavigationShell> {
   }
 
   Widget _buildMobileLayout() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final deskColor = isDark ? CompozyColors.desk : CompozyColorsLight.desk;
+    final canvasColor = isDark ? CompozyColors.canvas : CompozyColorsLight.canvas;
+    final borderColor = isDark ? const Color(0xFF202020) : CompozyColorsLight.line;
+    final fgStrong = isDark ? CompozyColors.fgStrong : CompozyColorsLight.fgStrong;
+    final subtle = isDark ? CompozyColors.subtle : CompozyColorsLight.subtle;
+
     return Scaffold(
-      backgroundColor: CompozyColors.desk,
+      backgroundColor: deskColor,
       appBar: _buildTopAppBar(),
       body: _buildBody(),
       bottomNavigationBar: Container(
         height: 64,
-        decoration: const BoxDecoration(
-          color: CompozyColors.canvas,
+        decoration: BoxDecoration(
+          color: canvasColor,
           border: Border(
-            top: BorderSide(color: Color(0xFF202020), width: 1),
+            top: BorderSide(color: borderColor, width: 1),
           ),
         ),
         child: BottomNavigationBar(
           key: const Key('app_bottom_nav_bar'),
           currentIndex: _selectedIndex,
           onTap: _onItemTapped,
-          backgroundColor: CompozyColors.canvas,
-          selectedItemColor: CompozyColors.fgStrong,
-          unselectedItemColor: CompozyColors.subtle,
+          backgroundColor: canvasColor,
+          selectedItemColor: fgStrong,
+          unselectedItemColor: subtle,
           selectedFontSize: 11,
           unselectedFontSize: 11,
           selectedLabelStyle: const TextStyle(
@@ -196,40 +214,47 @@ class _AppNavigationShellState extends State<AppNavigationShell> {
   }
 
   Widget _buildDesktopLayout() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final deskColor = isDark ? CompozyColors.desk : CompozyColorsLight.desk;
+    final canvasColor = isDark ? CompozyColors.canvas : CompozyColorsLight.canvas;
+    final elevatedColor = isDark ? CompozyColors.elevated : CompozyColorsLight.elevated;
+    final borderColor = isDark ? const Color(0xFF202020) : CompozyColorsLight.line;
+    final fgStrong = isDark ? CompozyColors.fgStrong : CompozyColorsLight.fgStrong;
+
     return Scaffold(
-      backgroundColor: CompozyColors.desk,
+      backgroundColor: deskColor,
       appBar: _buildTopAppBar(),
       body: Row(
         children: [
           Container(
-            decoration: const BoxDecoration(
-              color: CompozyColors.canvas,
+            decoration: BoxDecoration(
+              color: canvasColor,
               border: Border(
-                right: BorderSide(color: Color(0xFF202020), width: 1),
+                right: BorderSide(color: borderColor, width: 1),
               ),
             ),
             child: NavigationRail(
               key: const Key('app_navigation_rail'),
               selectedIndex: _selectedIndex,
               onDestinationSelected: _onItemTapped,
-              backgroundColor: CompozyColors.canvas,
-              indicatorColor: CompozyColors.elevated,
+              backgroundColor: canvasColor,
+              indicatorColor: elevatedColor,
               minWidth: 64,
-              destinations: const [
+              destinations: [
                 NavigationRailDestination(
-                  icon: Icon(Icons.chat_bubble_outline),
-                  selectedIcon: Icon(Icons.chat_bubble, color: CompozyColors.fgStrong),
-                  label: Text('Sessions'),
+                  icon: const Icon(Icons.chat_bubble_outline),
+                  selectedIcon: Icon(Icons.chat_bubble, color: fgStrong),
+                  label: const Text('Sessions'),
                 ),
                 NavigationRailDestination(
-                  icon: Icon(Icons.all_inclusive),
-                  selectedIcon: Icon(Icons.all_inclusive, color: CompozyColors.fgStrong),
-                  label: Text('Loops'),
+                  icon: const Icon(Icons.all_inclusive),
+                  selectedIcon: Icon(Icons.all_inclusive, color: fgStrong),
+                  label: const Text('Loops'),
                 ),
                 NavigationRailDestination(
-                  icon: Icon(Icons.tune),
-                  selectedIcon: Icon(Icons.tune, color: CompozyColors.fgStrong),
-                  label: Text('Settings'),
+                  icon: const Icon(Icons.tune),
+                  selectedIcon: Icon(Icons.tune, color: fgStrong),
+                  label: const Text('Settings'),
                 ),
               ],
             ),
@@ -249,18 +274,23 @@ class _NavPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final elevatedColor = isDark ? CompozyColors.elevated : CompozyColorsLight.elevated;
+    final fgStrong = isDark ? CompozyColors.fgStrong : CompozyColorsLight.fgStrong;
+    final pillBorder = isDark ? const Color(0xFF2E2E2E) : CompozyColorsLight.line;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 2),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
       decoration: BoxDecoration(
-        color: CompozyColors.elevated,
+        color: elevatedColor,
         borderRadius: CompozyRadius.pill,
-        border: Border.all(color: const Color(0xFF2E2E2E), width: 1),
+        border: Border.all(color: pillBorder, width: 1),
       ),
       child: Icon(
         icon,
         size: 18,
-        color: CompozyColors.fgStrong,
+        color: fgStrong,
       ),
     );
   }

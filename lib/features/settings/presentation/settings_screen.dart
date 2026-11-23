@@ -5,6 +5,7 @@ import '../../../core/network/health_checker.dart';
 import '../../../core/settings/settings.dart';
 import '../../../core/settings/settings_repository.dart';
 import '../../../core/theme/compozy_theme.dart';
+import '../../../core/theme/theme_mode_toggle.dart';
 import '../../connection/presentation/connection_banner.dart';
 
 /// Screen allowing the user to view and modify CompozyOS daemon settings,
@@ -199,7 +200,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     return Scaffold(
       key: const Key('settings_screen'),
-      backgroundColor: CompozyColors.desk,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: LayoutBuilder(
         builder: (context, constraints) {
           final isWide = constraints.maxWidth >= 600;
@@ -226,6 +227,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       _buildAuthCard(),
                       const SizedBox(height: 16),
                       _buildWorkspaceCard(),
+                      const SizedBox(height: 16),
+                      _buildThemeCard(),
                       const SizedBox(height: 20),
                       _buildActions(),
                       const SizedBox(height: 24),
@@ -303,6 +306,52 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildThemeCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? CompozyColors.card : CompozyColorsLight.card;
+    final borderColor = isDark ? CompozyColors.line : CompozyColorsLight.line;
+    final fgStrong = isDark ? CompozyColors.fgStrong : CompozyColorsLight.fgStrong;
+    final muted = isDark ? CompozyColors.muted : CompozyColorsLight.muted;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: CompozyRadius.card,
+        border: Border.all(color: borderColor, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.palette_outlined, size: 16, color: fgStrong),
+              const SizedBox(width: 8),
+              Text(
+                'Appearance & Theme',
+                style: TextStyle(
+                  color: fgStrong,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Select theme mode adhering to tokens-light.css and Compozy design tokens.',
+            style: TextStyle(
+              color: muted,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 12),
+          const ThemeModeToggle.segmented(key: Key('settings_theme_mode_toggle')),
+        ],
+      ),
     );
   }
 

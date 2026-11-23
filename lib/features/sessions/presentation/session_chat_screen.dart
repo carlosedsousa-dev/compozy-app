@@ -9,6 +9,7 @@ import '../domain/models/turn.dart';
 import 'widgets/approval_card.dart';
 import 'widgets/chat_bubble.dart';
 import 'widgets/session_badges.dart';
+import 'widgets/subagents_drawer.dart';
 import 'widgets/tool_execution_pill.dart';
 
 /// Screen displaying the conversation turn transcript for a CompozyOS session,
@@ -29,6 +30,7 @@ class SessionChatScreen extends ConsumerStatefulWidget {
 }
 
 class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   late final TextEditingController _promptController;
   late final ScrollController _scrollController;
   final List<Turn> _optimisticTurns = [];
@@ -273,9 +275,16 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
 
     final historyAsync = ref.watch(sessionHistoryProvider(widget.session.id));
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: CompozyColors.desk,
+      key: _scaffoldKey,
+      backgroundColor: isDark ? CompozyColors.desk : CompozyColorsLight.desk,
       appBar: _buildTopAppBar(context),
+      endDrawer: SubagentsDrawer(
+        session: widget.session,
+        onClose: () => Navigator.of(context).maybePop(),
+      ),
       body: Column(
         children: [
           // Guidance banner if session is in non-promptable state
@@ -352,7 +361,20 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
               AgentBadge(agent: widget.session.agent),
               const SizedBox(width: 8),
               StateBadge(state: _currentSessionState ?? widget.session.state),
-              const SizedBox(width: 16),
+              const SizedBox(width: 4),
+              IconButton(
+                key: const Key('chat_subagents_button'),
+                icon: const Icon(
+                  Icons.account_tree_outlined,
+                  size: 20,
+                  color: CompozyColors.fg,
+                ),
+                tooltip: 'Subagents Hierarchy',
+                onPressed: () {
+                  _scaffoldKey.currentState?.openEndDrawer();
+                },
+              ),
+              const SizedBox(width: 8),
             ],
           ),
         ),
