@@ -6,7 +6,7 @@ import 'compozy_api_client.dart';
 
 final healthCheckerProvider = Provider<HealthChecker>((ref) {
   final apiClient = ref.watch(compozyApiClientProvider);
-  return HealthChecker(apiClient: apiClient);
+  return HealthChecker(apiClient: apiClient, baseUrl: apiClient.baseUrl);
 });
 
 /// Client for checking connectivity and reachability of the CompozyOS daemon.
@@ -18,11 +18,12 @@ class HealthChecker {
   HealthChecker({
     this.apiClient,
     Dio? dio,
-    this.baseUrl = 'http://localhost:2123',
-  })  : _dio = dio ??
+    String? baseUrl,
+  })  : baseUrl = baseUrl ?? (apiClient?.baseUrl ?? defaultCompozyBaseUrl()),
+        _dio = dio ??
             Dio(
               BaseOptions(
-                baseUrl: baseUrl,
+                baseUrl: baseUrl ?? (apiClient?.baseUrl ?? defaultCompozyBaseUrl()),
                 connectTimeout: const Duration(seconds: 5),
                 receiveTimeout: const Duration(seconds: 10),
               ),

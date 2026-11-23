@@ -1,7 +1,18 @@
+import 'dart:io' show Platform;
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'api_exceptions.dart';
+
+/// Returns the default base URL for CompozyOS daemon.
+/// Uses 10.0.2.2 when running on Android emulator/device to reach host loopback.
+String defaultCompozyBaseUrl() {
+  if (!kIsWeb && Platform.isAndroid) {
+    return 'http://10.0.2.2:2123';
+  }
+  return 'http://localhost:2123';
+}
 
 /// Riverpod provider for [CompozyApiClient].
 final compozyApiClientProvider = Provider<CompozyApiClient>((ref) {
@@ -13,9 +24,15 @@ abstract class CompozyApiClient {
   /// Default factory constructor creating [CompozyApiClientImpl].
   factory CompozyApiClient({
     Dio? dio,
-    String baseUrl,
+    String? baseUrl,
     String? appToken,
-  }) = CompozyApiClientImpl;
+  }) {
+    return CompozyApiClientImpl(
+      dio: dio,
+      baseUrl: baseUrl ?? defaultCompozyBaseUrl(),
+      appToken: appToken,
+    );
+  }
 
   /// The active base URL for requests.
   String get baseUrl;
@@ -45,12 +62,13 @@ class CompozyApiClientImpl implements CompozyApiClient {
 
   CompozyApiClientImpl({
     Dio? dio,
-    this.baseUrl = 'http://localhost:2123',
+    String? baseUrl,
     this.appToken,
-  }) : _dio = dio ??
+  })  : baseUrl = baseUrl ?? defaultCompozyBaseUrl(),
+        _dio = dio ??
             Dio(
               BaseOptions(
-                baseUrl: baseUrl,
+                baseUrl: baseUrl ?? defaultCompozyBaseUrl(),
                 connectTimeout: const Duration(seconds: 5),
                 receiveTimeout: const Duration(seconds: 10),
                 headers: {
@@ -62,7 +80,7 @@ class CompozyApiClientImpl implements CompozyApiClient {
             ) {
     if (dio != null) {
       if (_dio.options.baseUrl.isEmpty) {
-        _dio.options.baseUrl = baseUrl;
+        _dio.options.baseUrl = this.baseUrl;
       }
       _dio.options.connectTimeout ??= const Duration(seconds: 5);
       _dio.options.receiveTimeout ??= const Duration(seconds: 10);
