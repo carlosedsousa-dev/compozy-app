@@ -16,4 +16,11 @@ abstract class SessionRepository {
   /// Throws [ArgumentError] if [message] is empty or whitespace-only.
   /// Throws [SessionBusyException] if daemon responds with 409 session busy.
   Future<void> sendPrompt(String sessionId, String message);
+
+  /// Submits a human-in-the-loop decision or permission approval/rejection for [sessionId].
+  Future<void> respondToApproval(
+    String sessionId, {
+    required bool approved,
+    String? approvalId,
+  });
 }

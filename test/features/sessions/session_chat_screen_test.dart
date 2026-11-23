@@ -39,6 +39,13 @@ class _FakeSessionRepository implements SessionRepository {
       throw sendPromptError!;
     }
   }
+
+  @override
+  Future<void> respondToApproval(
+    String sessionId, {
+    required bool approved,
+    String? approvalId,
+  }) async {}
 }
 
 void main() {

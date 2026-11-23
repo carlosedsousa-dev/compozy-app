@@ -93,7 +93,33 @@ sealed class SessionStreamEvent {
       );
     }
 
-    // 2. Tool execution / tool call
+    // 2. Approval request / decision pending
+    if (eventType == 'approval_request' ||
+        eventType == 'approval' ||
+        eventType == 'decision_required' ||
+        eventType == 'decision_pending' ||
+        json?['type'] == 'approval_request' ||
+        json?['type'] == 'decision_required' ||
+        json?['type'] == 'approval') {
+      return SessionApprovalRequestEvent(
+        toolName: json?['tool_name']?.toString() ??
+            json?['tool']?.toString() ??
+            json?['name']?.toString(),
+        description: json?['description']?.toString() ??
+            json?['message']?.toString() ??
+            json?['prompt']?.toString() ??
+            'Decision or permission approval requested.',
+        input: json?['input'] ?? json?['arguments'] ?? json?['args'],
+        approvalId: json?['approval_id']?.toString() ??
+            json?['approvalId']?.toString() ??
+            json?['id']?.toString(),
+        sessionId: sessionId,
+        turnId: turnId,
+        rawData: json ?? {'raw': sseEvent.data},
+      );
+    }
+
+    // 3. Tool execution / tool call
     if (eventType == 'tool_call' ||
         eventType == 'tool_execution' ||
         eventType == 'tool_progress' ||
@@ -276,9 +302,38 @@ class SessionToolExecutionEvent extends SessionStreamEvent {
       status == 'done' ||
       status == 'success';
 
+  /// Whether the tool execution is currently waiting for human approval.
+  bool get isWaitingForApproval =>
+      status == 'waiting_for_approval' ||
+      status == 'needs_approval' ||
+      status == 'pending_approval' ||
+      status == 'decision_pending';
+
   @override
   String toString() =>
       'SessionToolExecutionEvent(tool: $toolName, status: $status, callId: $toolCallId)';
+}
+
+/// Event emitted when an action requires human-in-the-loop decision or approval.
+class SessionApprovalRequestEvent extends SessionStreamEvent {
+  final String? toolName;
+  final String description;
+  final dynamic input;
+  final String? approvalId;
+
+  const SessionApprovalRequestEvent({
+    this.toolName,
+    required this.description,
+    this.input,
+    this.approvalId,
+    super.sessionId,
+    super.turnId,
+    super.rawData,
+  }) : super(eventType: 'approval_request');
+
+  @override
+  String toString() =>
+      'SessionApprovalRequestEvent(tool: $toolName, approvalId: $approvalId, sessionId: $sessionId)';
 }
 
 /// Event emitted when a turn lifecycle changes (started, busy, completed).

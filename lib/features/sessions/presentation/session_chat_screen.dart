@@ -6,6 +6,7 @@ import '../../../core/theme/compozy_theme.dart';
 import '../data/session_repository_impl.dart';
 import '../domain/models/session.dart';
 import '../domain/models/turn.dart';
+import 'widgets/approval_card.dart';
 import 'widgets/chat_bubble.dart';
 import 'widgets/session_badges.dart';
 import 'widgets/tool_execution_pill.dart';
@@ -39,6 +40,7 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
   String? _streamingText;
   String? _streamingTurnId;
   final Map<String, SessionToolExecutionEvent> _activeToolExecutions = {};
+  final Map<String, SessionApprovalRequestEvent> _pendingApprovals = {};
   List<Turn>? _streamTurns;
   bool _isStreaming = false;
 
@@ -165,12 +167,35 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
         _streamingText = (_streamingText ?? '') + event.textDelta;
       });
       _scrollToBottom();
-    } else if (event is SessionToolExecutionEvent) {
+    } else if (event is SessionApprovalRequestEvent) {
       setState(() {
-        final key = event.toolCallId ?? event.toolName;
-        _activeToolExecutions[key] = event;
+        final key = event.approvalId ??
+            event.toolName ??
+            'approval_${DateTime.now().millisecondsSinceEpoch}';
+        _pendingApprovals[key] = event;
       });
       _scrollToBottom();
+    } else if (event is SessionToolExecutionEvent) {
+      if (event.isWaitingForApproval) {
+        setState(() {
+          final key = event.toolCallId ?? event.toolName;
+          _pendingApprovals[key] = SessionApprovalRequestEvent(
+            toolName: event.toolName,
+            description: 'Permission approval requested to execute ${event.toolName}.',
+            input: event.input,
+            approvalId: event.toolCallId,
+            sessionId: event.sessionId,
+            turnId: event.turnId,
+          );
+        });
+        _scrollToBottom();
+      } else {
+        setState(() {
+          final key = event.toolCallId ?? event.toolName;
+          _activeToolExecutions[key] = event;
+        });
+        _scrollToBottom();
+      }
     } else if (event is SessionTurnEvent) {
       setState(() {
         if (event.status == 'started' || event.status == 'turn_start') {
@@ -368,13 +393,45 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
     );
   }
 
+  Future<void> _handleApprovalDecision({
+    required String approvalKey,
+    required bool approved,
+    String? toolName,
+  }) async {
+    setState(() {
+      _pendingApprovals.remove(approvalKey);
+    });
+
+    try {
+      final repository = ref.read(sessionRepositoryProvider);
+      await repository.respondToApproval(
+        widget.session.id,
+        approved: approved,
+        approvalId: approvalKey,
+      );
+    } catch (_) {}
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(approved ? 'Tool execution approved.' : 'Tool execution rejected.'),
+          backgroundColor: approved ? CompozyColors.success : CompozyColors.muted,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   Widget _buildTranscriptView(List<Turn> turns) {
     final currentTurns = _streamTurns ?? turns;
     final allTurns = [...currentTurns, ..._optimisticTurns];
     final activeToolEvents = _activeToolExecutions.values.toList();
+    final pendingApprovalEvents = _pendingApprovals.values.toList();
     final hasStreamingBubble =
         _streamingText != null && _streamingText!.isNotEmpty;
-    final hasLiveItems = activeToolEvents.isNotEmpty || hasStreamingBubble;
+    final hasLiveItems = activeToolEvents.isNotEmpty ||
+        hasStreamingBubble ||
+        pendingApprovalEvents.isNotEmpty;
 
     return RefreshIndicator(
       key: const Key('chat_refresh_indicator'),
@@ -396,7 +453,8 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
               itemCount: allTurns.length +
                   activeToolEvents.length +
-                  (hasStreamingBubble ? 1 : 0),
+                  (hasStreamingBubble ? 1 : 0) +
+                  pendingApprovalEvents.length,
               separatorBuilder: (context, index) => const SizedBox(height: 16),
               itemBuilder: (context, index) {
                 if (index < allTurns.length) {
@@ -404,6 +462,13 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
                   return TurnWidget(
                     turn: turn,
                     agentName: widget.session.agent,
+                    onApprovalDecision: (approved) => _handleApprovalDecision(
+                      approvalKey: turn.turnId,
+                      approved: approved,
+                      toolName: turn.toolCalls.isNotEmpty
+                          ? turn.toolCalls.first
+                          : null,
+                    ),
                   );
                 }
 
@@ -413,12 +478,49 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
                   return ToolExecutionPill.fromEvent(toolEvent);
                 }
 
-                return AgentChatBubble(
-                  key: const Key('streaming_agent_bubble'),
-                  message: _streamingText!,
-                  agentName: widget.session.agent,
-                  isStreaming: true,
-                );
+                final afterLiveToolsIndex =
+                    liveToolIndex - activeToolEvents.length;
+                if (hasStreamingBubble && afterLiveToolsIndex == 0) {
+                  return AgentChatBubble(
+                    key: const Key('streaming_agent_bubble'),
+                    message: _streamingText!,
+                    agentName: widget.session.agent,
+                    isStreaming: true,
+                  );
+                }
+
+                final approvalIndex =
+                    afterLiveToolsIndex - (hasStreamingBubble ? 1 : 0);
+                if (approvalIndex >= 0 &&
+                    approvalIndex < pendingApprovalEvents.length) {
+                  final approvalEvent = pendingApprovalEvents[approvalIndex];
+                  final key = approvalEvent.approvalId ??
+                      approvalEvent.toolName ??
+                      'approval_$approvalIndex';
+                  return ApprovalCard(
+                    key: Key('live_approval_card_$key'),
+                    toolName: approvalEvent.toolName,
+                    description: approvalEvent.description,
+                    details: approvalEvent.input,
+                    onApprove: () => _handleApprovalDecision(
+                      approvalKey: key,
+                      approved: true,
+                      toolName: approvalEvent.toolName,
+                    ),
+                    onReject: () => _handleApprovalDecision(
+                      approvalKey: key,
+                      approved: false,
+                      toolName: approvalEvent.toolName,
+                    ),
+                    onDecision: (approved) => _handleApprovalDecision(
+                      approvalKey: key,
+                      approved: approved,
+                      toolName: approvalEvent.toolName,
+                    ),
+                  );
+                }
+
+                return const SizedBox.shrink();
               },
             ),
     );

@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/theme/compozy_theme.dart';
 import '../../domain/models/turn.dart';
+import 'approval_card.dart';
 import 'session_badges.dart';
 
 /// Pulsing typing indicator cursor matching Compozy tokens:
@@ -577,15 +578,22 @@ class _ToolInvocationPillsState extends State<ToolInvocationPills> {
 class TurnWidget extends StatelessWidget {
   final Turn turn;
   final String? agentName;
+  final ValueChanged<bool>? onApprovalDecision;
 
   const TurnWidget({
     super.key,
     required this.turn,
     this.agentName,
+    this.onApprovalDecision,
   });
 
   @override
   Widget build(BuildContext context) {
+    final isWaitingForApproval = turn.status == 'waiting_for_approval' ||
+        turn.status == 'pending_approval' ||
+        turn.status == 'needs_approval' ||
+        turn.status == 'decision_pending';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
@@ -615,6 +623,20 @@ class TurnWidget extends StatelessWidget {
             turnId: turn.turnId,
             message: turn.agentMessage!,
             agentName: agentName,
+          ),
+        ],
+
+        // Approval Card when turn is waiting for approval
+        if (isWaitingForApproval) ...[
+          const SizedBox(height: 10),
+          ApprovalCard(
+            key: Key('turn_approval_card_${turn.turnId}'),
+            toolName: turn.toolCalls.isNotEmpty ? turn.toolCalls.first : null,
+            description: turn.agentMessage ??
+                'The agent is requesting permission or a decision before proceeding.',
+            onApprove: () => onApprovalDecision?.call(true),
+            onReject: () => onApprovalDecision?.call(false),
+            onDecision: onApprovalDecision,
           ),
         ],
       ],

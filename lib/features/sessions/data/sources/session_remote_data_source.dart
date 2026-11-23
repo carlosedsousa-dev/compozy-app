@@ -16,6 +16,11 @@ abstract class SessionRemoteDataSource {
   Future<SessionDto> getSession(String sessionId);
   Future<List<TurnDto>> getSessionHistory(String sessionId, {int? limit});
   Future<void> sendPrompt(String sessionId, String message);
+  Future<void> respondToApproval(
+    String sessionId, {
+    required bool approved,
+    String? approvalId,
+  });
 }
 
 /// Implementation of [SessionRemoteDataSource] using [CompozyApiClient].
@@ -152,5 +157,34 @@ class SessionRemoteDataSourceImpl implements SessionRemoteDataSource {
         data: {'prompt': message},
       );
     }
+  }
+
+  @override
+  Future<void> respondToApproval(
+    String sessionId, {
+    required bool approved,
+    String? approvalId,
+  }) async {
+    final payload = <String, dynamic>{
+      'approved': approved,
+      'decision': approved ? 'approve' : 'reject',
+      if (approvalId != null) 'approval_id': approvalId,
+    };
+
+    String? wsId = _workspaceBySessionId[sessionId];
+    if (wsId != null && wsId.isNotEmpty) {
+      try {
+        await apiClient.post(
+          '/api/workspaces/$wsId/sessions/$sessionId/approve',
+          data: payload,
+        );
+        return;
+      } catch (_) {}
+    }
+
+    await apiClient.post(
+      '/api/sessions/$sessionId/approve',
+      data: payload,
+    );
   }
 }

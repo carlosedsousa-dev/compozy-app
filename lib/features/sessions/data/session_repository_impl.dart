@@ -76,4 +76,17 @@ class SessionRepositoryImpl implements SessionRepository {
     }
     return remoteDataSource.sendPrompt(sessionId, message);
   }
+
+  @override
+  Future<void> respondToApproval(
+    String sessionId, {
+    required bool approved,
+    String? approvalId,
+  }) async {
+    return remoteDataSource.respondToApproval(
+      sessionId,
+      approved: approved,
+      approvalId: approvalId,
+    );
+  }
 }

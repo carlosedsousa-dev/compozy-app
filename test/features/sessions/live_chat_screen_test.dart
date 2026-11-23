@@ -28,6 +28,13 @@ class _FakeSessionRepository implements SessionRepository {
 
   @override
   Future<void> sendPrompt(String sessionId, String message) async {}
+
+  @override
+  Future<void> respondToApproval(
+    String sessionId, {
+    required bool approved,
+    String? approvalId,
+  }) async {}
 }
 
 void main() {
