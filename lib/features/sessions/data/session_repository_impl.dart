@@ -17,6 +17,13 @@ final sessionsProvider = FutureProvider<List<Session>>((ref) async {
   return repository.getSessions();
 });
 
+/// Riverpod provider to fetch turn history for a specific session.
+final sessionHistoryProvider =
+    FutureProvider.family<List<Turn>, String>((ref, sessionId) async {
+  final repository = ref.watch(sessionRepositoryProvider);
+  return repository.getSessionHistory(sessionId);
+});
+
 /// Riverpod provider for the currently selected session filter.
 final sessionFilterProvider = StateProvider<String>((ref) => 'All');
 
