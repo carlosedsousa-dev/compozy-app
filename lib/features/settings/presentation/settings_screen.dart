@@ -486,7 +486,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           color: CompozyColors.canvas,
           borderRadius: CompozyRadius.input,
           border: Border.all(
-            color: statusColor.withOpacity(0.4),
+            color: statusColor.withValues(alpha: 0.4),
             width: 1,
           ),
         ),

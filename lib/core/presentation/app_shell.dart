@@ -266,38 +266,5 @@ class _NavPill extends StatelessWidget {
   }
 }
 
-class _PlaceholderView extends StatelessWidget {
-  final String title;
-
-  const _PlaceholderView({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: CompozyColors.fgStrong,
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Coming soon in the next phase.',
-            style: TextStyle(
-              color: CompozyColors.muted,
-              fontSize: 13,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 /// Backward compatibility alias.
 typedef AppShell = AppNavigationShell;

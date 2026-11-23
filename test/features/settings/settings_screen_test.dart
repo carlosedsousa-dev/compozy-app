@@ -5,7 +5,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:compozy_app/core/network/health_checker.dart';
 import 'package:compozy_app/core/settings/settings.dart';
 import 'package:compozy_app/core/settings/settings_repository.dart';
-import 'package:compozy_app/core/theme/compozy_theme.dart';
 import 'package:compozy_app/features/connection/presentation/connection_banner.dart';
 import 'package:compozy_app/features/settings/presentation/settings_screen.dart';
 
