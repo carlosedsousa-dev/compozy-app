@@ -1,29 +1,35 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../settings/settings_repository.dart';
 import 'api_exceptions.dart';
 import 'compozy_api_client.dart';
 
 final healthCheckerProvider = Provider<HealthChecker>((ref) {
   final apiClient = ref.watch(compozyApiClientProvider);
-  return HealthChecker(apiClient: apiClient, baseUrl: apiClient.baseUrl);
+  final settings = ref.watch(settingsProvider);
+  return HealthChecker(apiClient: apiClient, baseUrl: settings.baseUrl);
 });
 
 /// Client for checking connectivity and reachability of the CompozyOS daemon.
 class HealthChecker {
   final CompozyApiClient? apiClient;
   final Dio _dio;
-  final String baseUrl;
+  final String _baseUrl;
+
+  /// The active base URL being checked.
+  String get baseUrl => apiClient?.baseUrl ?? _baseUrl;
 
   HealthChecker({
     this.apiClient,
     Dio? dio,
     String? baseUrl,
-  })  : baseUrl = baseUrl ?? (apiClient?.baseUrl ?? defaultCompozyBaseUrl()),
+  })  : _baseUrl = baseUrl ?? (apiClient?.baseUrl ?? defaultCompozyBaseUrl()),
         _dio = dio ??
             Dio(
               BaseOptions(
-                baseUrl: baseUrl ?? (apiClient?.baseUrl ?? defaultCompozyBaseUrl()),
+                baseUrl:
+                    baseUrl ?? (apiClient?.baseUrl ?? defaultCompozyBaseUrl()),
                 connectTimeout: const Duration(seconds: 5),
                 receiveTimeout: const Duration(seconds: 10),
               ),

@@ -3,6 +3,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../settings/settings.dart';
+import '../settings/settings_repository.dart';
 import 'api_exceptions.dart';
 
 /// Returns the default base URL for CompozyOS daemon.
@@ -15,8 +17,19 @@ String defaultCompozyBaseUrl() {
 }
 
 /// Riverpod provider for [CompozyApiClient].
+/// Dynamically updates configuration whenever [settingsProvider] changes.
 final compozyApiClientProvider = Provider<CompozyApiClient>((ref) {
-  return CompozyApiClient();
+  final initialSettings = ref.read(settingsProvider);
+  final client = CompozyApiClient(
+    baseUrl: initialSettings.baseUrl,
+    appToken: initialSettings.apiToken,
+  );
+
+  ref.listen<Settings>(settingsProvider, (previous, next) {
+    client.updateSettings(next);
+  });
+
+  return client;
 });
 
 /// Abstract client for communicating with the CompozyOS daemon REST API.
@@ -26,16 +39,35 @@ abstract class CompozyApiClient {
     Dio? dio,
     String? baseUrl,
     String? appToken,
+    Settings? settings,
   }) {
     return CompozyApiClientImpl(
       dio: dio,
-      baseUrl: baseUrl ?? defaultCompozyBaseUrl(),
-      appToken: appToken,
+      baseUrl: baseUrl ?? settings?.baseUrl ?? defaultCompozyBaseUrl(),
+      appToken: appToken ?? settings?.apiToken,
     );
   }
 
   /// The active base URL for requests.
   String get baseUrl;
+
+  /// The active app/API token for requests, if any.
+  String? get appToken;
+
+  /// The underlying [Dio] instance.
+  Dio get dio;
+
+  /// Updates the Base URL dynamically on this client and its underlying HTTP client.
+  void updateBaseUrl(String newBaseUrl);
+
+  /// Updates the app token dynamically on this client and its underlying HTTP client headers.
+  void updateAppToken(String? newAppToken);
+
+  /// Updates configuration dynamically from parameters.
+  void updateConfiguration({String? baseUrl, String? appToken});
+
+  /// Updates configuration directly from [Settings].
+  void updateSettings(Settings settings);
 
   /// Performs a GET request to the given [path].
   Future<Map<String, dynamic>> get(
@@ -54,17 +86,25 @@ abstract class CompozyApiClient {
 /// Default implementation of [CompozyApiClient] using [Dio].
 class CompozyApiClientImpl implements CompozyApiClient {
   final Dio _dio;
+  String _baseUrl;
+  String? _appToken;
 
   @override
-  final String baseUrl;
+  Dio get dio => _dio;
 
-  final String? appToken;
+  @override
+  String get baseUrl =>
+      _dio.options.baseUrl.isNotEmpty ? _dio.options.baseUrl : _baseUrl;
+
+  @override
+  String? get appToken => _appToken;
 
   CompozyApiClientImpl({
     Dio? dio,
     String? baseUrl,
-    this.appToken,
-  })  : baseUrl = baseUrl ?? defaultCompozyBaseUrl(),
+    String? appToken,
+  })  : _baseUrl = baseUrl ?? defaultCompozyBaseUrl(),
+        _appToken = appToken,
         _dio = dio ??
             Dio(
               BaseOptions(
@@ -80,15 +120,49 @@ class CompozyApiClientImpl implements CompozyApiClient {
             ) {
     if (dio != null) {
       if (_dio.options.baseUrl.isEmpty) {
-        _dio.options.baseUrl = this.baseUrl;
+        _dio.options.baseUrl = _baseUrl;
       }
       _dio.options.connectTimeout ??= const Duration(seconds: 5);
       _dio.options.receiveTimeout ??= const Duration(seconds: 10);
       _dio.options.headers.putIfAbsent('Accept', () => 'application/json');
-      if (appToken != null && appToken!.isNotEmpty) {
+      if (appToken != null && appToken.isNotEmpty) {
         _dio.options.headers['Authorization'] = 'Bearer $appToken';
       }
     }
+  }
+
+  @override
+  void updateBaseUrl(String newBaseUrl) {
+    _baseUrl = newBaseUrl;
+    _dio.options.baseUrl = newBaseUrl;
+  }
+
+  @override
+  void updateAppToken(String? newAppToken) {
+    _appToken = newAppToken;
+    if (newAppToken != null && newAppToken.isNotEmpty) {
+      _dio.options.headers['Authorization'] = 'Bearer $newAppToken';
+    } else {
+      _dio.options.headers.remove('Authorization');
+    }
+  }
+
+  @override
+  void updateConfiguration({String? baseUrl, String? appToken}) {
+    if (baseUrl != null) {
+      updateBaseUrl(baseUrl);
+    }
+    if (appToken != null || (baseUrl != null && appToken == null)) {
+      updateAppToken(appToken);
+    }
+  }
+
+  @override
+  void updateSettings(Settings settings) {
+    updateConfiguration(
+      baseUrl: settings.baseUrl,
+      appToken: settings.apiToken,
+    );
   }
 
   @override
