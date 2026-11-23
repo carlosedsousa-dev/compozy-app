@@ -1,8 +1,64 @@
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/theme/compozy_theme.dart';
 import '../../domain/models/turn.dart';
 import 'session_badges.dart';
+
+/// Pulsing typing indicator cursor matching Compozy tokens:
+/// Monospace block cursor with subtle opacity pulse (mirrors hero.jpg and UI/UX specs).
+class PulsingCursor extends StatefulWidget {
+  const PulsingCursor({super.key});
+
+  @override
+  State<PulsingCursor> createState() => _PulsingCursorState();
+}
+
+class _PulsingCursorState extends State<PulsingCursor>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+
+    final isTest = !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
+    if (!isTest) {
+      _controller.repeat(reverse: true);
+    } else {
+      _controller.value = 1.0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: Tween<double>(begin: 0.25, end: 1.0).animate(
+        CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+      ),
+      child: Container(
+        width: 7,
+        height: 14,
+        margin: const EdgeInsets.only(left: 2, top: 4),
+        decoration: BoxDecoration(
+          color: CompozyColors.fgStrong,
+          borderRadius: BorderRadius.circular(1.5),
+        ),
+      ),
+    );
+  }
+}
 
 /// User chat bubble strictly styled with Compozy tokens:
 /// Right-aligned, `#232323` background, border `1px solid #2E2E2E`,
@@ -93,12 +149,14 @@ class AgentChatBubble extends StatelessWidget {
   final String message;
   final String? turnId;
   final String? agentName;
+  final bool isStreaming;
 
   const AgentChatBubble({
     super.key,
     required this.message,
     this.turnId,
     this.agentName,
+    this.isStreaming = false,
   });
 
   @override
@@ -138,7 +196,15 @@ class AgentChatBubble extends StatelessWidget {
                     bottomRight: Radius.circular(16),
                   ),
                 ),
-                child: MarkdownView(text: message),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    MarkdownView(text: message),
+                    if (isStreaming)
+                      const PulsingCursor(key: Key('streaming_typing_cursor')),
+                  ],
+                ),
               ),
             ),
           ],

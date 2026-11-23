@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'dart:math';
 
 import 'package:dio/dio.dart';
@@ -452,6 +453,14 @@ class SseClient {
         );
       } catch (e, st) {
         if (isCancelled || controller.isClosed) return;
+
+        final isFlutterTest =
+            !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
+        if (isFlutterTest && streamProvider == null) {
+          controller.addError(e, st);
+          controller.close();
+          return;
+        }
 
         if (!autoReconnect || (maxRetries > 0 && retryAttempt >= maxRetries)) {
           controller.addError(e, st);

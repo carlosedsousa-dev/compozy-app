@@ -8,6 +8,7 @@ import '../domain/models/session.dart';
 import '../domain/models/turn.dart';
 import 'widgets/chat_bubble.dart';
 import 'widgets/session_badges.dart';
+import 'widgets/tool_execution_pill.dart';
 
 /// Screen displaying the conversation turn transcript for a CompozyOS session,
 /// collapsible tool execution pills, and an interactive prompt input container,
@@ -33,13 +34,21 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
   bool _isSubmitting = false;
   bool _canSend = false;
 
+  // Real-time live streaming state (US-006.AC-3, US-006.AC-4)
+  String? _currentSessionState;
+  String? _streamingText;
+  String? _streamingTurnId;
+  final Map<String, SessionToolExecutionEvent> _activeToolExecutions = {};
+  List<Turn>? _streamTurns;
+  bool _isStreaming = false;
+
   bool get _isSessionBusy {
-    final state = widget.session.state.toLowerCase();
-    return state == 'busy' || state == 'waiting';
+    final state = (_currentSessionState ?? widget.session.state).toLowerCase();
+    return state == 'busy' || state == 'waiting' || _isStreaming;
   }
 
   bool get _isSessionStopped {
-    final state = widget.session.state.toLowerCase();
+    final state = (_currentSessionState ?? widget.session.state).toLowerCase();
     return state == 'stopped' || state == 'failed' || state == 'canceled';
   }
 
@@ -114,6 +123,7 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
       if (mounted) {
         setState(() {
           _optimisticTurns.remove(optimisticTurn);
+          _streamTurns = null;
           _isSubmitting = false;
         });
         _scrollToBottom();
@@ -147,8 +157,95 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
     }
   }
 
+  void _handleStreamEvent(SessionStreamEvent event) {
+    if (event is SessionTextDeltaEvent) {
+      setState(() {
+        _isStreaming = true;
+        _streamingTurnId ??= event.turnId;
+        _streamingText = (_streamingText ?? '') + event.textDelta;
+      });
+      _scrollToBottom();
+    } else if (event is SessionToolExecutionEvent) {
+      setState(() {
+        final key = event.toolCallId ?? event.toolName;
+        _activeToolExecutions[key] = event;
+      });
+      _scrollToBottom();
+    } else if (event is SessionTurnEvent) {
+      setState(() {
+        if (event.status == 'started' || event.status == 'turn_start') {
+          _isStreaming = true;
+          _streamingTurnId = event.turnId;
+          _streamingText = '';
+          _activeToolExecutions.clear();
+        } else if (event.status == 'completed' ||
+            event.status == 'turn_complete' ||
+            event.status == 'turn_completed') {
+          if (event.turn != null) {
+            _streamTurns ??= List.from(widget.initialTurns ??
+                ref.read(sessionHistoryProvider(widget.session.id)).value ??
+                []);
+            final existingIdx = _streamTurns!
+                .indexWhere((t) => t.turnId == event.turn!.turnId);
+            if (existingIdx >= 0) {
+              _streamTurns![existingIdx] = event.turn!;
+            } else {
+              _streamTurns!.add(event.turn!);
+            }
+          } else if (_streamingText != null && _streamingText!.isNotEmpty) {
+            _streamTurns ??= List.from(widget.initialTurns ??
+                ref.read(sessionHistoryProvider(widget.session.id)).value ??
+                []);
+            final turnId = event.turnId ??
+                _streamingTurnId ??
+                'turn_${DateTime.now().millisecondsSinceEpoch}';
+            _streamTurns!.add(Turn(
+              turnId: turnId,
+              userMessage: event.userMessage,
+              agentMessage: event.agentMessage ?? _streamingText,
+              status: 'completed',
+              toolCalls:
+                  _activeToolExecutions.values.map((e) => e.toolName).toList(),
+            ));
+          }
+          _streamingText = null;
+          _streamingTurnId = null;
+          _activeToolExecutions.clear();
+          _isStreaming = false;
+          if (event.userMessage != null) {
+            _optimisticTurns
+                .removeWhere((t) => t.userMessage == event.userMessage);
+          }
+        }
+      });
+      _scrollToBottom();
+    } else if (event is SessionTranscriptSnapshotEvent) {
+      setState(() {
+        _streamTurns = List.from(event.turns);
+        _streamingText = null;
+        _streamingTurnId = null;
+        _activeToolExecutions.clear();
+        _isStreaming = false;
+      });
+      _scrollToBottom();
+    } else if (event is SessionStateChangedEvent) {
+      setState(() {
+        _currentSessionState = event.state;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    ref.listen<AsyncValue<SessionStreamEvent>>(
+      sessionStreamProvider(widget.session.id),
+      (previous, next) {
+        next.whenData((event) {
+          _handleStreamEvent(event);
+        });
+      },
+    );
+
     final historyAsync = ref.watch(sessionHistoryProvider(widget.session.id));
 
     return Scaffold(
@@ -229,7 +326,7 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
               const SizedBox(width: 8),
               AgentBadge(agent: widget.session.agent),
               const SizedBox(width: 8),
-              StateBadge(state: widget.session.state),
+              StateBadge(state: _currentSessionState ?? widget.session.state),
               const SizedBox(width: 16),
             ],
           ),
@@ -272,7 +369,12 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
   }
 
   Widget _buildTranscriptView(List<Turn> turns) {
-    final allTurns = [...turns, ..._optimisticTurns];
+    final currentTurns = _streamTurns ?? turns;
+    final allTurns = [...currentTurns, ..._optimisticTurns];
+    final activeToolEvents = _activeToolExecutions.values.toList();
+    final hasStreamingBubble =
+        _streamingText != null && _streamingText!.isNotEmpty;
+    final hasLiveItems = activeToolEvents.isNotEmpty || hasStreamingBubble;
 
     return RefreshIndicator(
       key: const Key('chat_refresh_indicator'),
@@ -281,21 +383,41 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
       onRefresh: () async {
         ref.invalidate(sessionHistoryProvider(widget.session.id));
         await ref.read(sessionHistoryProvider(widget.session.id).future);
+        setState(() {
+          _streamTurns = null;
+        });
       },
-      child: allTurns.isEmpty
+      child: (allTurns.isEmpty && !hasLiveItems)
           ? _buildEmptyTranscript()
           : ListView.separated(
               key: const Key('transcript_list_view'),
               controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-              itemCount: allTurns.length,
+              itemCount: allTurns.length +
+                  activeToolEvents.length +
+                  (hasStreamingBubble ? 1 : 0),
               separatorBuilder: (context, index) => const SizedBox(height: 16),
               itemBuilder: (context, index) {
-                final turn = allTurns[index];
-                return TurnWidget(
-                  turn: turn,
+                if (index < allTurns.length) {
+                  final turn = allTurns[index];
+                  return TurnWidget(
+                    turn: turn,
+                    agentName: widget.session.agent,
+                  );
+                }
+
+                final liveToolIndex = index - allTurns.length;
+                if (liveToolIndex < activeToolEvents.length) {
+                  final toolEvent = activeToolEvents[liveToolIndex];
+                  return ToolExecutionPill.fromEvent(toolEvent);
+                }
+
+                return AgentChatBubble(
+                  key: const Key('streaming_agent_bubble'),
+                  message: _streamingText!,
                   agentName: widget.session.agent,
+                  isStreaming: true,
                 );
               },
             ),
