@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:compozy_app/core/theme/compozy_theme.dart';
 import 'package:compozy_app/features/sessions/data/session_repository_impl.dart';
 import 'package:compozy_app/features/sessions/domain/models/session.dart';
-import 'package:compozy_app/features/sessions/domain/models/session_stream_event.dart';
 import 'package:compozy_app/features/sessions/domain/models/turn.dart';
 import 'package:compozy_app/features/sessions/domain/repositories/session_repository.dart';
 import 'package:compozy_app/features/sessions/presentation/session_chat_screen.dart';

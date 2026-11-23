@@ -168,7 +168,7 @@ class SessionRemoteDataSourceImpl implements SessionRemoteDataSource {
     final payload = <String, dynamic>{
       'approved': approved,
       'decision': approved ? 'approve' : 'reject',
-      if (approvalId != null) 'approval_id': approvalId,
+      'approval_id': ?approvalId,
     };
 
     String? wsId = _workspaceBySessionId[sessionId];

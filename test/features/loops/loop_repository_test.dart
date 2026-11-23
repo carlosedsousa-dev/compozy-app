@@ -7,7 +7,6 @@ import 'package:compozy_app/features/loops/data/loop_repository_impl.dart';
 import 'package:compozy_app/features/loops/data/models/loop_dto.dart';
 import 'package:compozy_app/features/loops/data/sources/loop_remote_data_source.dart';
 import 'package:compozy_app/features/loops/domain/loop_definition.dart';
-import 'package:compozy_app/features/loops/domain/loop_run_result.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

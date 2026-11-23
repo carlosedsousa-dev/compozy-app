@@ -465,7 +465,10 @@ class LoopDetailsSheet extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        _CategoryBadge(category: loop.categoryDisplay),
+                        _CategoryBadge(
+                          category: loop.categoryDisplay,
+                          loopName: loop.name,
+                        ),
                       ],
                     ),
                   ),

@@ -3,8 +3,6 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../core/theme/compozy_theme.dart';
 import '../data/loop_repository_impl.dart';
-import '../domain/loop_definition.dart';
-import '../domain/loop_run_result.dart';
 import '../domain/repositories/loop_repository.dart';
 
 /// Modal bottom sheet for configuring and dispatching a CompozyOS Loop run.
@@ -663,7 +661,7 @@ class _RunLoopSheetState extends ConsumerState<RunLoopSheet> {
             Switch(
               key: Key('run_loop_input_$key'),
               value: _boolValues[key] ?? false,
-              activeColor: CompozyColors.fgStrong,
+              activeThumbColor: CompozyColors.fgStrong,
               activeTrackColor: CompozyColors.lineStrong,
               inactiveThumbColor: CompozyColors.muted,
               inactiveTrackColor: CompozyColors.desk,

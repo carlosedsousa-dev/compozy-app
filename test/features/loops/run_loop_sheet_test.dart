@@ -4,8 +4,6 @@ import 'package:material_ui/material_ui.dart';
 
 import 'package:compozy_app/core/theme/compozy_theme.dart';
 import 'package:compozy_app/features/loops/data/loop_repository_impl.dart';
-import 'package:compozy_app/features/loops/domain/loop_definition.dart';
-import 'package:compozy_app/features/loops/domain/loop_run_result.dart';
 import 'package:compozy_app/features/loops/domain/repositories/loop_repository.dart';
 import 'package:compozy_app/features/loops/presentation/run_loop_sheet.dart';
 

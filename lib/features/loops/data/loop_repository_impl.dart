@@ -1,7 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../domain/loop_definition.dart';
-import '../domain/loop_run_result.dart';
 import '../domain/repositories/loop_repository.dart';
 import 'sources/loop_remote_data_source.dart';
 
