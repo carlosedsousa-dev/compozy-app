@@ -5,6 +5,11 @@ import '../../../core/theme/compozy_theme.dart';
 import '../../connection/presentation/connection_banner.dart';
 import '../data/loop_repository_impl.dart';
 import '../domain/loop_definition.dart';
+import 'run_loop_sheet.dart';
+import 'widgets/loop_card.dart';
+
+export 'run_loop_sheet.dart';
+export 'widgets/loop_card.dart';
 
 /// Screen displaying the catalog of available workspace Loops with
 /// category filtering, contract inspection, and responsive layout,
@@ -197,7 +202,7 @@ class LoopsCatalogScreen extends ConsumerWidget {
             separatorBuilder: (context, index) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
               final loop = loops[index];
-              return _LoopCard(
+              return LoopCard(
                 loop: loop,
                 onTap: () => _handleCardTap(context, loop),
               );
@@ -217,7 +222,7 @@ class LoopsCatalogScreen extends ConsumerWidget {
             itemCount: loops.length,
             itemBuilder: (context, index) {
               final loop = loops[index];
-              return _LoopCard(
+              return LoopCard(
                 loop: loop,
                 onTap: () => _handleCardTap(context, loop),
               );
@@ -352,161 +357,6 @@ class LoopsCatalogScreen extends ConsumerWidget {
           ),
         );
       },
-    );
-  }
-}
-
-/// Visual card representing one Loop definition in the catalog, strictly mirroring loops.jpg.
-class _LoopCard extends StatelessWidget {
-  final LoopDefinition loop;
-  final VoidCallback onTap;
-
-  const _LoopCard({
-    required this.loop,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      key: Key('loop_card_${loop.name}'),
-      decoration: BoxDecoration(
-        color: CompozyColors.card,
-        borderRadius: CompozyRadius.card,
-        border: Border.all(color: CompozyColors.line, width: 1),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: CompozyRadius.card,
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header: Loop title + Category badge
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        loop.name,
-                        style: const TextStyle(
-                          color: CompozyColors.fgStrong,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: -0.1,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    _CategoryBadge(
-                      category: loop.categoryDisplay,
-                      loopName: loop.name,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-
-                // Description
-                Text(
-                  loop.description,
-                  style: const TextStyle(
-                    color: CompozyColors.fg,
-                    fontSize: 13,
-                    height: 1.4,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 12),
-
-                // Footer metadata row (mirrors loops.jpg)
-                Row(
-                  children: [
-                    Expanded(
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (loop.inputs.isNotEmpty) ...[
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 7,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: CompozyColors.surface2,
-                                  borderRadius: CompozyRadius.pill,
-                                  border: Border.all(
-                                    color: CompozyColors.line,
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Text(
-                                  '${loop.inputs.length} inputs',
-                                  style: const TextStyle(
-                                    color: CompozyColors.muted,
-                                    fontSize: 11,
-                                    fontFamily: 'monospace',
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                            ],
-                            if (loop.definitionOfDone.isNotEmpty) ...[
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 7,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: CompozyColors.surface2,
-                                  borderRadius: CompozyRadius.pill,
-                                  border: Border.all(
-                                    color: CompozyColors.line,
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: const [
-                                    Icon(
-                                      Icons.verified_outlined,
-                                      size: 11,
-                                      color: CompozyColors.success,
-                                    ),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      'Contract',
-                                      style: TextStyle(
-                                        color: CompozyColors.muted,
-                                        fontSize: 11,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Icon(
-                      Icons.chevron_right,
-                      size: 18,
-                      color: CompozyColors.subtle,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
@@ -668,6 +518,54 @@ class LoopDetailsSheet extends StatelessWidget {
 
                     // Input Schema Section
                     _buildInputsSection(),
+                    const SizedBox(height: 24),
+
+                    // Run Loop Action Button (Inverted Monochrome Pill)
+                    SizedBox(
+                      width: double.infinity,
+                      height: 44,
+                      child: ElevatedButton(
+                        key: const Key('details_run_loop_button'),
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          showModalBottomSheet<void>(
+                            context: context,
+                            backgroundColor: CompozyColors.card,
+                            isScrollControlled: true,
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                            ),
+                            builder: (_) => RunLoopSheet(loop: loop),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: CompozyColors.primary,
+                          foregroundColor: CompozyColors.primaryInk,
+                          elevation: 0,
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: CompozyRadius.pill,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(
+                              Icons.play_arrow_rounded,
+                              size: 16,
+                              color: CompozyColors.primaryInk,
+                            ),
+                            SizedBox(width: 6),
+                            Text(
+                              'Run Loop',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/compozy_api_client.dart';
+import '../../domain/loop_run_result.dart';
 import '../models/loop_dto.dart';
 
 /// Riverpod provider for [LoopRemoteDataSource].
@@ -13,6 +14,10 @@ final loopRemoteDataSourceProvider = Provider<LoopRemoteDataSource>((ref) {
 abstract class LoopRemoteDataSource {
   Future<List<LoopDto>> getLoops();
   Future<LoopDto> getLoopDetails(String name);
+  Future<LoopRunResult> runLoop(
+    String name, {
+    Map<String, dynamic> inputs = const {},
+  });
 }
 
 /// Implementation of [LoopRemoteDataSource] using [CompozyApiClient].
@@ -78,5 +83,24 @@ class LoopRemoteDataSourceImpl implements LoopRemoteDataSource {
     }
 
     throw FormatException('Loop not found: $name');
+  }
+
+  @override
+  Future<LoopRunResult> runLoop(
+    String name, {
+    Map<String, dynamic> inputs = const {},
+  }) async {
+    final payload = <String, dynamic>{
+      'name': name,
+      'loop_name': name,
+      if (inputs.isNotEmpty) 'inputs': inputs,
+    };
+
+    final response = await apiClient.post(
+      '/api/loops/run',
+      data: payload,
+    );
+
+    return LoopRunResult.fromJson(response);
   }
 }

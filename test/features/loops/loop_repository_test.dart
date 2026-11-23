@@ -7,6 +7,7 @@ import 'package:compozy_app/features/loops/data/loop_repository_impl.dart';
 import 'package:compozy_app/features/loops/data/models/loop_dto.dart';
 import 'package:compozy_app/features/loops/data/sources/loop_remote_data_source.dart';
 import 'package:compozy_app/features/loops/domain/loop_definition.dart';
+import 'package:compozy_app/features/loops/domain/loop_run_result.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -292,6 +293,57 @@ void main() {
       expect(minimalDto.category, isNull);
       expect(minimalDto.contract, isEmpty);
       expect(minimalDto.inputs, isEmpty);
+    });
+
+    test('runLoop dispatches POST /api/loops/run and returns LoopRunResult', () async {
+      final dio = Dio(BaseOptions(baseUrl: 'http://localhost:2123'));
+      final mockAdapter = _MockHttpClientAdapter(
+        statusCode: 200,
+        responseBody: jsonEncode({
+          'run': {
+            'id': 'run-xyz-777',
+            'status': 'queued',
+            'loop_name': 'implement-tasks',
+          },
+        }),
+      );
+      dio.httpClientAdapter = mockAdapter;
+
+      final apiClient = CompozyApiClient(dio: dio);
+      final remoteDataSource = LoopRemoteDataSourceImpl(apiClient: apiClient);
+      final repository = LoopRepositoryImpl(remoteDataSource: remoteDataSource);
+
+      final result = await repository.runLoop(
+        'implement-tasks',
+        inputs: {'slug': 'compozy-app-v2', 'auto_commit': true},
+      );
+
+      expect(result.runId, equals('run-xyz-777'));
+      expect(result.status, equals('queued'));
+      expect(result.loopName, equals('implement-tasks'));
+      expect(mockAdapter.lastRequestOptions?.path, equals('/api/loops/run'));
+      expect(mockAdapter.lastRequestOptions?.method, equals('POST'));
+    });
+
+    test('LoopRunResult handles direct run_id, json serialization, and equality', () {
+      final res1 = LoopRunResult.fromJson({
+        'run_id': 'run-101',
+        'status': 'running',
+        'loop_name': 'council',
+      });
+
+      expect(res1.runId, equals('run-101'));
+      expect(res1.status, equals('running'));
+      expect(res1.loopName, equals('council'));
+
+      final json = res1.toJson();
+      expect(json['run_id'], equals('run-101'));
+      expect(json['status'], equals('running'));
+
+      final res2 = LoopRunResult(runId: 'run-101', status: 'running', loopName: 'council');
+      expect(res1, equals(res2));
+      expect(res1.hashCode, equals(res2.hashCode));
+      expect(res1.toString(), contains('run-101'));
     });
   });
 }
