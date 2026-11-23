@@ -1,30 +1,79 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'package:compozy_app/features/connection/presentation/connection_banner.dart';
+import 'package:compozy_app/features/sessions/data/session_repository_impl.dart';
 import 'package:compozy_app/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('AppNavigationShell renders mobile layout (< 600dp) with BottomNavigationBar', (tester) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() => tester.view.resetPhysicalSize());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sessionsProvider.overrideWith((ref) => Future.value(const [])),
+          connectionStatusProvider.overrideWith((ref) => Future.value(true)),
+        ],
+        child: const MyApp(),
+      ),
+    );
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    await tester.pumpAndSettle();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Verify workspace title in app bar
+    expect(find.text('compozy-app'), findsOneWidget);
+
+    // Verify BottomNavigationBar is used on mobile
+    expect(find.byType(BottomNavigationBar), findsOneWidget);
+    expect(find.byType(NavigationRail), findsNothing);
+
+    // Verify nav destinations
+    expect(find.text('Sessions'), findsOneWidget);
+    expect(find.text('Loops'), findsOneWidget);
+    expect(find.text('Settings'), findsOneWidget);
+
+    // Switch tab to Loops
+    await tester.tap(find.text('Loops'));
+    await tester.pumpAndSettle();
+    expect(find.text('Loops Catalog'), findsOneWidget);
+
+    // Switch tab to Settings
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    expect(find.text('Daemon Settings'), findsOneWidget);
+  });
+
+  testWidgets('AppNavigationShell renders desktop layout (>= 600dp) with NavigationRail', (tester) async {
+    tester.view.physicalSize = const Size(1024, 768);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sessionsProvider.overrideWith((ref) => Future.value(const [])),
+          connectionStatusProvider.overrideWith((ref) => Future.value(true)),
+        ],
+        child: const MyApp(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Verify workspace title in app bar
+    expect(find.text('compozy-app'), findsOneWidget);
+
+    // Verify NavigationRail is used on desktop/tablet
+    expect(find.byType(NavigationRail), findsOneWidget);
+    expect(find.byType(BottomNavigationBar), findsNothing);
+
+    // Verify rail destinations
+    expect(find.text('Sessions'), findsOneWidget);
+    expect(find.text('Loops'), findsOneWidget);
+    expect(find.text('Settings'), findsOneWidget);
   });
 }

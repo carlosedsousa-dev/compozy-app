@@ -11,6 +11,28 @@ final sessionRepositoryProvider = Provider<SessionRepository>((ref) {
   return SessionRepositoryImpl(remoteDataSource: remoteDataSource);
 });
 
+/// Riverpod provider to fetch all sessions.
+final sessionsProvider = FutureProvider<List<Session>>((ref) async {
+  final repository = ref.watch(sessionRepositoryProvider);
+  return repository.getSessions();
+});
+
+/// Riverpod provider for the currently selected session filter.
+final sessionFilterProvider = StateProvider<String>((ref) => 'All');
+
+/// Riverpod provider for filtered sessions.
+final filteredSessionsProvider = Provider<AsyncValue<List<Session>>>((ref) {
+  final sessionsAsync = ref.watch(sessionsProvider);
+  final filter = ref.watch(sessionFilterProvider);
+
+  return sessionsAsync.whenData((sessions) {
+    if (filter == 'All') return sessions;
+    return sessions
+        .where((s) => s.state.toLowerCase() == filter.toLowerCase())
+        .toList();
+  });
+});
+
 /// Implementation of [SessionRepository] coordinating with [SessionRemoteDataSource].
 class SessionRepositoryImpl implements SessionRepository {
   final SessionRemoteDataSource remoteDataSource;
