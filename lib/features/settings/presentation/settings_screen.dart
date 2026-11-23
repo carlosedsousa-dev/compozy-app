@@ -131,15 +131,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         SnackBar(
           key: const Key('settings_saved_snackbar'),
           content: const Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.check_circle, size: 16, color: CompozyColors.success),
               SizedBox(width: 8),
-              Text(
-                'Settings saved successfully',
-                style: TextStyle(
-                  color: CompozyColors.fgStrong,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
+              Expanded(
+                child: Text(
+                  'Settings saved successfully',
+                  style: TextStyle(
+                    color: CompozyColors.fgStrong,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ],

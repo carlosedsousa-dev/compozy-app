@@ -534,11 +534,6 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
                       approved: false,
                       toolName: approvalEvent.toolName,
                     ),
-                    onDecision: (approved) => _handleApprovalDecision(
-                      approvalKey: key,
-                      approved: approved,
-                      toolName: approvalEvent.toolName,
-                    ),
                   );
                 }
 
