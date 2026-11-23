@@ -156,7 +156,6 @@ class _AppNavigationShellState extends State<AppNavigationShell> {
       appBar: _buildTopAppBar(),
       body: _buildBody(),
       bottomNavigationBar: Container(
-        height: 64,
         decoration: BoxDecoration(
           color: canvasColor,
           border: Border(
