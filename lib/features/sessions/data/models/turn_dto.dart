@@ -43,13 +43,18 @@ class TurnDto {
     if (events is List) {
       for (final evt in events) {
         if (evt is Map<String, dynamic>) {
+          final type = evt['type']?.toString();
           final actorKind = evt['actor_kind']?.toString();
           final content = evt['content'];
-          if (actorKind == 'user') {
+          if (type == 'user_message' || actorKind == 'user') {
             userMsg ??= content is String
                 ? content
                 : (content is Map ? content['text']?.toString() : null);
-          } else if (actorKind == 'agent' || actorKind == 'assistant') {
+          } else if (type == 'agent_message' ||
+              type == 'assistant_message' ||
+              type == 'text' ||
+              actorKind == 'agent' ||
+              actorKind == 'assistant') {
             agentMsg ??= content is String
                 ? content
                 : (content is Map ? content['text']?.toString() : null);

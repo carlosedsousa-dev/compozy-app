@@ -8,6 +8,7 @@ class SessionDto {
   final String state;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final String? workspaceId;
 
   const SessionDto({
     required this.id,
@@ -16,6 +17,7 @@ class SessionDto {
     required this.state,
     required this.createdAt,
     required this.updatedAt,
+    this.workspaceId,
   });
 
   factory SessionDto.fromJson(Map<String, dynamic> json) {
@@ -32,6 +34,8 @@ class SessionDto {
         json['agent_name']?.toString() ??
         'general';
     final state = json['state']?.toString() ?? 'idle';
+    final workspaceId = json['workspace_id']?.toString() ??
+        json['workspaceId']?.toString();
 
     final createdAt = parseDate(json['createdAt'] ?? json['created_at']);
     final updatedAt = parseDate(
@@ -48,6 +52,7 @@ class SessionDto {
       state: state,
       createdAt: createdAt,
       updatedAt: updatedAt,
+      workspaceId: workspaceId,
     );
   }
 
@@ -59,6 +64,7 @@ class SessionDto {
       'state': state,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
+      if (workspaceId != null) 'workspace_id': workspaceId,
     };
   }
 
@@ -70,6 +76,7 @@ class SessionDto {
       state: state,
       createdAt: createdAt,
       updatedAt: updatedAt,
+      workspaceId: workspaceId,
     );
   }
 }

@@ -21,6 +21,7 @@ abstract class SessionRemoteDataSource {
 /// Implementation of [SessionRemoteDataSource] using [CompozyApiClient].
 class SessionRemoteDataSourceImpl implements SessionRemoteDataSource {
   final CompozyApiClient apiClient;
+  final Map<String, String> _workspaceBySessionId = {};
 
   SessionRemoteDataSourceImpl({required this.apiClient});
 
@@ -44,10 +45,16 @@ class SessionRemoteDataSourceImpl implements SessionRemoteDataSource {
     final rawList =
         response['sessions'] ?? response['data'] ?? response['items'];
     if (rawList is List) {
-      return rawList
+      final list = rawList
           .whereType<Map>()
           .map((item) => SessionDto.fromJson(Map<String, dynamic>.from(item)))
           .toList();
+      for (final dto in list) {
+        if (dto.workspaceId != null && dto.workspaceId!.isNotEmpty) {
+          _workspaceBySessionId[dto.id] = dto.workspaceId!;
+        }
+      }
+      return list;
     }
 
     return const [];
@@ -59,7 +66,11 @@ class SessionRemoteDataSourceImpl implements SessionRemoteDataSource {
 
     final rawSession = response['session'] ?? response;
     if (rawSession is Map) {
-      return SessionDto.fromJson(Map<String, dynamic>.from(rawSession));
+      final dto = SessionDto.fromJson(Map<String, dynamic>.from(rawSession));
+      if (dto.workspaceId != null && dto.workspaceId!.isNotEmpty) {
+        _workspaceBySessionId[dto.id] = dto.workspaceId!;
+      }
+      return dto;
     }
 
     throw FormatException('Unexpected response format for session $sessionId');
@@ -72,10 +83,34 @@ class SessionRemoteDataSourceImpl implements SessionRemoteDataSource {
       queryParams = {'limit': limit.toString()};
     }
 
-    final response = await apiClient.get(
-      '/api/sessions/$sessionId/history',
-      queryParameters: queryParams,
-    );
+    String? wsId = _workspaceBySessionId[sessionId];
+    if (wsId == null) {
+      try {
+        final session = await getSession(sessionId);
+        wsId = session.workspaceId;
+      } catch (_) {}
+    }
+
+    final path = (wsId != null && wsId.isNotEmpty)
+        ? '/api/workspaces/$wsId/sessions/$sessionId/history'
+        : '/api/sessions/$sessionId/history';
+
+    Map<String, dynamic> response;
+    try {
+      response = await apiClient.get(
+        path,
+        queryParameters: queryParams,
+      );
+    } catch (_) {
+      if (wsId != null) {
+        response = await apiClient.get(
+          '/api/sessions/$sessionId/history',
+          queryParameters: queryParams,
+        );
+      } else {
+        rethrow;
+      }
+    }
 
     final rawList = response['history'] ??
         response['turns'] ??
@@ -98,9 +133,24 @@ class SessionRemoteDataSourceImpl implements SessionRemoteDataSource {
       throw ArgumentError('Prompt message cannot be empty or whitespace only');
     }
 
-    await apiClient.post(
-      '/api/sessions/$sessionId/prompt',
-      data: {'prompt': message},
-    );
+    String? wsId = _workspaceBySessionId[sessionId];
+    if (wsId != null && wsId.isNotEmpty) {
+      final idKey = 'prompt_${DateTime.now().microsecondsSinceEpoch}';
+      final payload = {
+        'prompt': message,
+        'message': message,
+        'idempotency_key': idKey,
+        'message_id': 'msg_$idKey',
+      };
+      await apiClient.post(
+        '/api/workspaces/$wsId/sessions/$sessionId/prompt',
+        data: payload,
+      );
+    } else {
+      await apiClient.post(
+        '/api/sessions/$sessionId/prompt',
+        data: {'prompt': message},
+      );
+    }
   }
 }

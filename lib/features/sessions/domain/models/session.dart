@@ -9,6 +9,7 @@ class Session {
   final String state;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final String? workspaceId;
 
   const Session({
     required this.id,
@@ -17,6 +18,7 @@ class Session {
     required this.state,
     required this.createdAt,
     required this.updatedAt,
+    this.workspaceId,
   });
 
   Session copyWith({
@@ -26,6 +28,7 @@ class Session {
     String? state,
     DateTime? createdAt,
     DateTime? updatedAt,
+    String? workspaceId,
   }) {
     return Session(
       id: id ?? this.id,
@@ -34,6 +37,7 @@ class Session {
       state: state ?? this.state,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      workspaceId: workspaceId ?? this.workspaceId,
     );
   }
 
@@ -47,7 +51,8 @@ class Session {
           agent == other.agent &&
           state == other.state &&
           createdAt == other.createdAt &&
-          updatedAt == other.updatedAt;
+          updatedAt == other.updatedAt &&
+          workspaceId == other.workspaceId;
 
   @override
   int get hashCode =>
@@ -56,7 +61,8 @@ class Session {
       agent.hashCode ^
       state.hashCode ^
       createdAt.hashCode ^
-      updatedAt.hashCode;
+      updatedAt.hashCode ^
+      workspaceId.hashCode;
 
   @override
   String toString() {
