@@ -16,6 +16,23 @@ final loopsProvider = FutureProvider<List<LoopDefinition>>((ref) async {
   return repository.getLoops();
 });
 
+/// Riverpod provider for the currently selected loop category filter.
+final loopCategoryFilterProvider = StateProvider<String>((ref) => 'All');
+
+/// Riverpod provider for filtered loops based on selected category.
+final filteredLoopsProvider = Provider<AsyncValue<List<LoopDefinition>>>((ref) {
+  final loopsAsync = ref.watch(loopsProvider);
+  final category = ref.watch(loopCategoryFilterProvider);
+
+  return loopsAsync.whenData((loops) {
+    if (category.toLowerCase() == 'all') return loops;
+    return loops
+        .where((l) =>
+            l.categoryDisplay.toLowerCase() == category.toLowerCase())
+        .toList();
+  });
+});
+
 /// Implementation of [LoopRepository] coordinating with [LoopRemoteDataSource].
 class LoopRepositoryImpl implements LoopRepository {
   final LoopRemoteDataSource remoteDataSource;

@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../theme/compozy_theme.dart';
 import '../../features/connection/presentation/connection_banner.dart';
+import '../../features/loops/presentation/loops_catalog_screen.dart';
 import '../../features/sessions/presentation/sessions_list_screen.dart';
 
 /// Responsive application shell adapting between mobile (< 600dp)
@@ -32,7 +33,7 @@ class _AppNavigationShellState extends State<AppNavigationShell> {
       case 0:
         return const SessionsListScreen();
       case 1:
-        return const _PlaceholderView(title: 'Loops Catalog');
+        return const LoopsCatalogScreen();
       case 2:
         return const _PlaceholderView(title: 'Daemon Settings');
       default:
