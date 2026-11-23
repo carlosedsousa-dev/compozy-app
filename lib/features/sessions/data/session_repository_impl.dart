@@ -5,6 +5,10 @@ import '../domain/models/turn.dart';
 import '../domain/repositories/session_repository.dart';
 import 'sources/session_remote_data_source.dart';
 
+export '../domain/models/session_stream_event.dart';
+export '../domain/repositories/session_stream_repository.dart';
+export 'session_stream_repository_impl.dart';
+
 /// Riverpod provider for [SessionRepository].
 final sessionRepositoryProvider = Provider<SessionRepository>((ref) {
   final remoteDataSource = ref.watch(sessionRemoteDataSourceProvider);
