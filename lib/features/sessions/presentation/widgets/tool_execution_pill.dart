@@ -6,7 +6,7 @@ import '../../domain/models/session_stream_event.dart';
 
 /// Compact tool execution pill displaying real-time tool calls (active, settled, error).
 /// Strictly styled with Compozy tokens:
-/// Background `#1A1A1A`, 1px solid border `#2C2C2C`, monospaced 11sp typography.
+/// Dynamic theme-aware palette, monospaced 11sp typography.
 /// Mirrors hero.jpg, handoff.jpg, and REFERENCE_GUIDE.md.
 class ToolExecutionPill extends StatefulWidget {
   final String toolName;
@@ -51,8 +51,7 @@ class ToolExecutionPill extends StatefulWidget {
       status == 'success';
 
   /// Whether the tool execution encountered an error / failed.
-  bool get isFailed =>
-      status == 'failed' || status == 'error';
+  bool get isFailed => status == 'failed' || status == 'error';
 
   @override
   State<ToolExecutionPill> createState() => _ToolExecutionPillState();
@@ -61,8 +60,7 @@ class ToolExecutionPill extends StatefulWidget {
 class _ToolExecutionPillState extends State<ToolExecutionPill> {
   bool _isExpanded = false;
 
-  bool get _hasDetails =>
-      widget.input != null || widget.output != null;
+  bool get _hasDetails => widget.input != null || widget.output != null;
 
   String _formatPayload(dynamic payload) {
     if (payload == null) return '';
@@ -77,6 +75,7 @@ class _ToolExecutionPillState extends State<ToolExecutionPill> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
     final effectiveKey = widget.key ??
         Key('tool_pill_${widget.isActive ? 'active' : 'completed'}_${widget.toolName}');
 
@@ -86,100 +85,115 @@ class _ToolExecutionPillState extends State<ToolExecutionPill> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              key: effectiveKey,
-              borderRadius: CompozyRadius.pill,
-              onTap: _hasDetails
-                  ? () {
-                      setState(() {
-                        _isExpanded = !_isExpanded;
-                      });
-                    }
-                  : null,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A1A),
-                  borderRadius: CompozyRadius.pill,
-                  border: Border.all(
-                    color: widget.isActive
-                        ? const Color(0xFF383838)
-                        : const Color(0xFF2C2C2C),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Status indicator icon
-                    if (widget.isActive)
-                      const SizedBox(
-                        key: Key('tool_pill_spinner'),
-                        width: 10,
-                        height: 10,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 1.5,
-                          color: CompozyColors.success,
-                        ),
-                      )
-                    else if (widget.isFailed)
-                      const Icon(
-                        Icons.error_outline,
-                        key: Key('tool_pill_error_icon'),
-                        size: 12,
-                        color: CompozyColors.danger,
-                      )
-                    else
-                      const Icon(
-                        Icons.check,
-                        key: Key('tool_pill_check_icon'),
-                        size: 12,
-                        color: CompozyColors.success,
+          Semantics(
+            button: _hasDetails,
+            expanded: _hasDetails ? _isExpanded : null,
+            label:
+                'tool: ${widget.toolName}, status ${widget.status}${_hasDetails ? (_isExpanded ? ', expanded' : ', collapsed') : ''}',
+            child: Material(
+              color: Colors.transparent,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 48),
+                child: Center(
+                  child: InkWell(
+                    key: effectiveKey,
+                    borderRadius: CompozyRadius.pill,
+                    onTap: _hasDetails
+                        ? () {
+                            setState(() {
+                              _isExpanded = !_isExpanded;
+                            });
+                          }
+                        : null,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
                       ),
-                    const SizedBox(width: 6),
+                      decoration: BoxDecoration(
+                        color: palette.canvasSoft,
+                        borderRadius: CompozyRadius.pill,
+                        border: Border.all(
+                          color: widget.isActive
+                              ? palette.lineStrong
+                              : palette.line,
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Status indicator icon
+                          if (widget.isActive)
+                            SizedBox(
+                              key: const Key('tool_pill_spinner'),
+                              width: 10,
+                              height: 10,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 1.5,
+                                color: palette.success,
+                              ),
+                            )
+                          else if (widget.isFailed)
+                            Icon(
+                              Icons.error_outline,
+                              key: const Key('tool_pill_error_icon'),
+                              size: 12,
+                              color: palette.danger,
+                            )
+                          else
+                            Icon(
+                              Icons.check,
+                              key: const Key('tool_pill_check_icon'),
+                              size: 12,
+                              color: palette.success,
+                            ),
+                          const SizedBox(width: 6),
 
-                    // Monospaced 11sp tool name text
-                    Text(
-                      'tool: ${widget.toolName}',
-                      style: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 11,
-                        color: widget.isActive
-                            ? CompozyColors.fg
-                            : (widget.isFailed
-                                ? CompozyColors.danger
-                                : CompozyColors.muted),
-                        fontWeight:
-                            widget.isActive ? FontWeight.w600 : FontWeight.w500,
+                          // Monospaced 11sp tool name text
+                          Text(
+                            'tool: ${widget.toolName}',
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 11,
+                              color: widget.isActive
+                                  ? palette.fg
+                                  : (widget.isFailed
+                                      ? palette.danger
+                                      : palette.muted),
+                              fontWeight: widget.isActive
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
+                            ),
+                          ),
+
+                          if (widget.isActive) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              key: const Key('tool_pill_active_dot'),
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: palette.success,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ],
+
+                          if (_hasDetails) ...[
+                            const SizedBox(width: 4),
+                            Icon(
+                              _isExpanded
+                                  ? Icons.keyboard_arrow_up
+                                  : Icons.keyboard_arrow_down,
+                              size: 14,
+                              color: palette.subtle,
+                            ),
+                          ],
+                        ],
                       ),
                     ),
-
-                    if (widget.isActive) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        key: const Key('tool_pill_active_dot'),
-                        width: 6,
-                        height: 6,
-                        decoration: const BoxDecoration(
-                          color: CompozyColors.success,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ],
-
-                    if (_hasDetails) ...[
-                      const SizedBox(width: 4),
-                      Icon(
-                        _isExpanded
-                            ? Icons.keyboard_arrow_up
-                            : Icons.keyboard_arrow_down,
-                        size: 14,
-                        color: CompozyColors.subtle,
-                      ),
-                    ],
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -189,57 +203,59 @@ class _ToolExecutionPillState extends State<ToolExecutionPill> {
           if (_isExpanded && _hasDetails) ...[
             const SizedBox(height: 6),
             Container(
-              key: Key('tool_pill_details_${widget.toolCallId ?? widget.toolName}'),
+              key: Key(
+                'tool_pill_details_${widget.toolCallId ?? widget.toolName}',
+              ),
               constraints: const BoxConstraints(maxWidth: 420),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: CompozyColors.desk,
+                color: palette.desk,
                 borderRadius: CompozyRadius.input,
-                border: Border.all(color: CompozyColors.line, width: 1),
+                border: Border.all(color: palette.line, width: 1),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (widget.input != null) ...[
-                    const Text(
+                    Text(
                       'Input:',
                       style: TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 10,
-                        color: CompozyColors.subtle,
+                        color: palette.subtle,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 2),
                     SelectableText(
                       _formatPayload(widget.input),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 11,
-                        color: CompozyColors.fg,
+                        color: palette.fg,
                       ),
                     ),
                   ],
                   if (widget.input != null && widget.output != null)
                     const SizedBox(height: 8),
                   if (widget.output != null) ...[
-                    const Text(
+                    Text(
                       'Output:',
                       style: TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 10,
-                        color: CompozyColors.subtle,
+                        color: palette.subtle,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 2),
                     SelectableText(
                       _formatPayload(widget.output),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 11,
-                        color: CompozyColors.fg,
+                        color: palette.fg,
                       ),
                     ),
                   ],

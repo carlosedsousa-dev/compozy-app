@@ -52,16 +52,17 @@ class ConnectionBanner extends ConsumerWidget {
   }
 
   Widget _buildCompact(BuildContext context, WidgetRef ref, bool online) {
-    final statusColor = online ? CompozyColors.success : CompozyColors.danger;
+    final palette = context.palette;
+    final statusColor = online ? palette.success : palette.danger;
     final label = online ? 'online' : 'offline';
 
-    return Container(
+    final pillWidget = Container(
       key: Key(online ? 'connection_pill_online' : 'connection_pill_offline'),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: CompozyColors.card,
+        color: palette.card,
         borderRadius: CompozyRadius.pill,
-        border: Border.all(color: CompozyColors.line, width: 1),
+        border: Border.all(color: palette.line, width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -86,17 +87,44 @@ class ConnectionBanner extends ConsumerWidget {
         ],
       ),
     );
+
+    if (online) {
+      return Semantics(
+        label: 'Daemon connected (online)',
+        child: pillWidget,
+      );
+    }
+
+    return Semantics(
+      label: 'Daemon disconnected (offline). Tap to retry connection.',
+      button: true,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: CompozyRadius.pill,
+          onTap: () {
+            if (onRetry != null) {
+              onRetry!();
+            }
+            ref.invalidate(connectionStatusProvider);
+          },
+          child: pillWidget,
+        ),
+      ),
+    );
   }
 
   Widget _buildFullBanner(BuildContext context, WidgetRef ref, bool online) {
+    final palette = context.palette;
+
     if (online) {
       return Container(
         key: const Key('connection_banner_online'),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: CompozyColors.card,
+          color: palette.card,
           borderRadius: CompozyRadius.input,
-          border: Border.all(color: CompozyColors.line, width: 1),
+          border: Border.all(color: palette.line, width: 1),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -104,25 +132,25 @@ class ConnectionBanner extends ConsumerWidget {
             Container(
               width: 8,
               height: 8,
-              decoration: const BoxDecoration(
-                color: CompozyColors.success,
+              decoration: BoxDecoration(
+                color: palette.success,
                 shape: BoxShape.circle,
               ),
             ),
             const SizedBox(width: 8),
-            const Text(
+            Text(
               'Connected',
               style: TextStyle(
-                color: CompozyColors.success,
+                color: palette.success,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(width: 4),
-            const Text(
+            Text(
               '(online)',
               style: TextStyle(
-                color: CompozyColors.muted,
+                color: palette.muted,
                 fontSize: 12,
               ),
             ),
@@ -137,17 +165,17 @@ class ConnectionBanner extends ConsumerWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: CompozyColors.card,
+        color: palette.card,
         borderRadius: CompozyRadius.input,
-        border: Border.all(color: CompozyColors.danger, width: 1),
+        border: Border.all(color: palette.danger, width: 1),
       ),
       child: Row(
         children: [
           Container(
             width: 9,
             height: 9,
-            decoration: const BoxDecoration(
-              color: CompozyColors.danger,
+            decoration: BoxDecoration(
+              color: palette.danger,
               shape: BoxShape.circle,
             ),
           ),
@@ -157,21 +185,21 @@ class ConnectionBanner extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Row(
+                Row(
                   children: [
                     Text(
                       'Disconnected',
                       style: TextStyle(
-                        color: CompozyColors.danger,
+                        color: palette.danger,
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    SizedBox(width: 4),
+                    const SizedBox(width: 4),
                     Text(
                       '(offline)',
                       style: TextStyle(
-                        color: CompozyColors.muted,
+                        color: palette.muted,
                         fontSize: 12,
                       ),
                     ),
@@ -181,8 +209,8 @@ class ConnectionBanner extends ConsumerWidget {
                 Text(
                   errorMessage ??
                       'Daemon unreachable at http://localhost:2123',
-                  style: const TextStyle(
-                    color: CompozyColors.muted,
+                  style: TextStyle(
+                    color: palette.muted,
                     fontSize: 12,
                   ),
                 ),
@@ -199,10 +227,11 @@ class ConnectionBanner extends ConsumerWidget {
               ref.invalidate(connectionStatusProvider);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: CompozyColors.primary,
-              foregroundColor: CompozyColors.primaryInk,
+              backgroundColor: palette.primary,
+              foregroundColor: palette.primaryInk,
               elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              minimumSize: const Size(64, 48),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               shape: const RoundedRectangleBorder(
                 borderRadius: CompozyRadius.pill,
               ),

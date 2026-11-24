@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../../core/presentation/widgets/compozy_empty_state.dart';
+import '../../../core/presentation/widgets/compozy_error_state.dart';
 import '../../../core/theme/compozy_theme.dart';
 import '../../connection/presentation/connection_banner.dart';
 import '../data/loop_repository_impl.dart';
@@ -24,13 +26,14 @@ class LoopsCatalogScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final palette = context.palette;
     final loopsAsync = ref.watch(loopsProvider);
     final filteredAsync = ref.watch(filteredLoopsProvider);
     final selectedCategory = ref.watch(loopCategoryFilterProvider);
     final isOnline = ref.watch(connectionStatusProvider).value ?? true;
 
     return Scaffold(
-      backgroundColor: CompozyColors.desk,
+      backgroundColor: palette.desk,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -48,7 +51,7 @@ class LoopsCatalogScreen extends ConsumerWidget {
           loopsAsync.maybeWhen(
             data: (allLoops) {
               if (allLoops.isEmpty) return const SizedBox.shrink();
-              return _buildCategoryFilterRow(ref, allLoops, selectedCategory);
+              return _buildCategoryFilterRow(context, ref, allLoops, selectedCategory);
             },
             orElse: () => const SizedBox.shrink(),
           ),
@@ -57,23 +60,18 @@ class LoopsCatalogScreen extends ConsumerWidget {
           Expanded(
             child: RefreshIndicator(
               key: const Key('loops_refresh_indicator'),
-              color: CompozyColors.fgStrong,
-              backgroundColor: CompozyColors.elevated,
+              color: palette.fgStrong,
+              backgroundColor: palette.card,
               onRefresh: () async {
                 ref.invalidate(loopsProvider);
                 await ref.read(loopsProvider.future);
               },
               child: filteredAsync.when(
-                loading: () => const Center(
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: CompozyColors.fg,
-                  ),
-                ),
+                loading: () => _buildLoadingSkeleton(context),
                 error: (error, stack) => _buildErrorView(ref, error),
                 data: (loops) {
                   if (loops.isEmpty) {
-                    return _buildEmptyView();
+                    return _buildEmptyView(ref, selectedCategory);
                   }
                   return _buildLoopsContent(context, loops);
                 },
@@ -89,14 +87,16 @@ class LoopsCatalogScreen extends ConsumerWidget {
     BuildContext context,
     AsyncValue<List<LoopDefinition>> loopsAsync,
   ) {
+    final palette = context.palette;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Row(
         children: [
-          const Text(
+          Text(
             'Loops Catalog',
             style: TextStyle(
-              color: CompozyColors.fgStrong,
+              color: palette.fgStrong,
               fontSize: 16,
               fontWeight: FontWeight.w600,
               letterSpacing: -0.1,
@@ -107,14 +107,14 @@ class LoopsCatalogScreen extends ConsumerWidget {
             data: (loops) => Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: CompozyColors.elevated,
+                color: palette.surface2,
                 borderRadius: CompozyRadius.pill,
-                border: Border.all(color: CompozyColors.line, width: 1),
+                border: Border.all(color: palette.line, width: 1),
               ),
               child: Text(
                 '${loops.length}',
-                style: const TextStyle(
-                  color: CompozyColors.muted,
+                style: TextStyle(
+                  color: palette.muted,
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                 ),
@@ -128,10 +128,12 @@ class LoopsCatalogScreen extends ConsumerWidget {
   }
 
   Widget _buildCategoryFilterRow(
+    BuildContext context,
     WidgetRef ref,
     List<LoopDefinition> allLoops,
     String selectedCategory,
   ) {
+    final palette = context.palette;
     final categories = <String>['All'];
     for (final loop in allLoops) {
       final cat = loop.categoryDisplay;
@@ -142,7 +144,7 @@ class LoopsCatalogScreen extends ConsumerWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
@@ -152,34 +154,44 @@ class LoopsCatalogScreen extends ConsumerWidget {
 
             return Padding(
               padding: const EdgeInsets.only(right: 8),
-              child: ChoiceChip(
-                key: Key('filter_chip_${category.toLowerCase()}'),
-                label: Text(category),
+              child: Semantics(
                 selected: isSelected,
-                selectedColor: CompozyColors.elevated,
-                backgroundColor: CompozyColors.card,
-                side: BorderSide(
-                  color: isSelected
-                      ? CompozyColors.lineStrong
-                      : CompozyColors.line,
-                  width: 1,
+                button: true,
+                label: '$category category filter',
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 48),
+                  child: Center(
+                    child: ChoiceChip(
+                      key: Key('filter_chip_${category.toLowerCase()}'),
+                      label: Text(category),
+                      selected: isSelected,
+                      selectedColor: palette.elevated,
+                      backgroundColor: palette.card,
+                      side: BorderSide(
+                        color: isSelected
+                            ? palette.lineStrong
+                            : palette.line,
+                        width: 1,
+                      ),
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: CompozyRadius.pill,
+                      ),
+                      labelStyle: TextStyle(
+                        color: isSelected
+                            ? palette.fgStrong
+                            : palette.muted,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                        fontSize: 13,
+                      ),
+                      onSelected: (selected) {
+                        if (selected) {
+                          ref.read(loopCategoryFilterProvider.notifier).state =
+                              category;
+                        }
+                      },
+                    ),
+                  ),
                 ),
-                shape: const RoundedRectangleBorder(
-                  borderRadius: CompozyRadius.pill,
-                ),
-                labelStyle: TextStyle(
-                  color: isSelected
-                      ? CompozyColors.fgStrong
-                      : CompozyColors.muted,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                  fontSize: 13,
-                ),
-                onSelected: (selected) {
-                  if (selected) {
-                    ref.read(loopCategoryFilterProvider.notifier).state =
-                        category;
-                  }
-                },
               ),
             );
           }).toList(),
@@ -188,10 +200,48 @@ class LoopsCatalogScreen extends ConsumerWidget {
     );
   }
 
+  Widget _buildLoadingSkeleton(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 600;
+        final textScaler = MediaQuery.textScalerOf(context);
+        final cardExtent = textScaler.scale(180.0).clamp(180.0, 360.0);
+
+        if (isMobile) {
+          return ListView.separated(
+            key: const Key('loops_loading_skeletons'),
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            itemCount: 4,
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
+            itemBuilder: (context, index) => const LoopCardSkeleton(),
+          );
+        } else {
+          return GridView.builder(
+            key: const Key('loops_loading_skeletons'),
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 480,
+              mainAxisExtent: cardExtent,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+            ),
+            itemCount: 6,
+            itemBuilder: (context, index) => const LoopCardSkeleton(),
+          );
+        }
+      },
+    );
+  }
+
   Widget _buildLoopsContent(BuildContext context, List<LoopDefinition> loops) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isMobile = constraints.maxWidth < 600;
+        final textScaler = MediaQuery.textScalerOf(context);
+        // Adaptive height based on text scaling to prevent overflow clipping
+        final cardExtent = textScaler.scale(180.0).clamp(180.0, 360.0);
 
         if (isMobile) {
           return ListView.separated(
@@ -213,9 +263,9 @@ class LoopsCatalogScreen extends ConsumerWidget {
             key: const Key('loops_grid_view'),
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+            gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
               maxCrossAxisExtent: 480,
-              mainAxisExtent: 180,
+              mainAxisExtent: cardExtent,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
             ),
@@ -239,7 +289,7 @@ class LoopsCatalogScreen extends ConsumerWidget {
     } else {
       showModalBottomSheet<void>(
         context: context,
-        backgroundColor: CompozyColors.card,
+        backgroundColor: context.palette.card,
         isScrollControlled: true,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -249,114 +299,34 @@ class LoopsCatalogScreen extends ConsumerWidget {
     }
   }
 
-  Widget _buildEmptyView() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: constraints.maxHeight),
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  key: const Key('loops_empty_view'),
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Icon(
-                      Icons.all_inclusive,
-                      size: 44,
-                      color: CompozyColors.muted,
-                    ),
-                    SizedBox(height: 16),
-                    Text(
-                      'No loops found',
-                      style: TextStyle(
-                        color: CompozyColors.fgStrong,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'No workspace loops are registered in this workspace.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: CompozyColors.muted,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
+  Widget _buildEmptyView(WidgetRef ref, String selectedCategory) {
+    final isFiltered = selectedCategory.toLowerCase() != 'all';
+
+    return CompozyEmptyState(
+      key: const Key('loops_empty_view'),
+      icon: Icons.all_inclusive,
+      title: isFiltered ? 'No loops in $selectedCategory' : 'No loops found',
+      message: isFiltered
+          ? 'No loops match the "$selectedCategory" category filter.'
+          : 'No workspace loops are registered in this workspace.',
+      actionLabel: isFiltered ? 'Reset Filter' : 'Refresh',
+      onAction: () {
+        if (isFiltered) {
+          ref.read(loopCategoryFilterProvider.notifier).state = 'All';
+        }
+        ref.invalidate(loopsProvider);
       },
     );
   }
 
   Widget _buildErrorView(WidgetRef ref, Object error) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: constraints.maxHeight),
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  key: const Key('loops_error_view'),
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.error_outline,
-                      size: 44,
-                      color: CompozyColors.danger,
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Failed to load loops',
-                      style: TextStyle(
-                        color: CompozyColors.fgStrong,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      error.toString(),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: CompozyColors.muted,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () => ref.invalidate(loopsProvider),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: CompozyColors.primary,
-                        foregroundColor: CompozyColors.primaryInk,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: CompozyRadius.pill,
-                        ),
-                      ),
-                      child: const Text(
-                        'Retry',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
+    return CompozyErrorState(
+      key: const Key('loops_error_view'),
+      title: 'Failed to load loops',
+      message: 'Unable to retrieve workspace loops. Check daemon connection and try again.',
+      details: error.toString(),
+      onRetry: () => ref.invalidate(loopsProvider),
+      retryLabel: 'Retry',
     );
   }
 }
@@ -373,27 +343,29 @@ class _CategoryBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
+
     return Container(
       key: loopName != null ? Key('loop_category_pill_$loopName') : null,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: CompozyColors.surface2,
+        color: palette.surface2,
         borderRadius: CompozyRadius.pill,
-        border: Border.all(color: CompozyColors.line, width: 1),
+        border: Border.all(color: palette.line, width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
+          Icon(
             Icons.folder_outlined,
             size: 11,
-            color: CompozyColors.info,
+            color: palette.info,
           ),
           const SizedBox(width: 4),
           Text(
             category,
-            style: const TextStyle(
-              color: CompozyColors.info,
+            style: TextStyle(
+              color: palette.info,
               fontSize: 11,
               fontWeight: FontWeight.w500,
             ),
@@ -416,16 +388,18 @@ class LoopDetailsSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
+
     return Container(
       key: const Key('loop_details_bottom_sheet'),
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.85,
       ),
-      decoration: const BoxDecoration(
-        color: CompozyColors.card,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      decoration: BoxDecoration(
+        color: palette.card,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
         border: Border(
-          top: BorderSide(color: CompozyColors.line, width: 1),
+          top: BorderSide(color: palette.line, width: 1),
         ),
       ),
       child: SafeArea(
@@ -439,8 +413,8 @@ class LoopDetailsSheet extends StatelessWidget {
                 margin: const EdgeInsets.only(top: 12, bottom: 8),
                 width: 36,
                 height: 4,
-                decoration: const BoxDecoration(
-                  color: CompozyColors.lineStrong,
+                decoration: BoxDecoration(
+                  color: palette.lineStrong,
                   borderRadius: CompozyRadius.pill,
                 ),
               ),
@@ -457,8 +431,8 @@ class LoopDetailsSheet extends StatelessWidget {
                         Flexible(
                           child: Text(
                             loop.name,
-                            style: const TextStyle(
-                              color: CompozyColors.fgStrong,
+                            style: TextStyle(
+                              color: palette.fgStrong,
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
                             ),
@@ -474,9 +448,11 @@ class LoopDetailsSheet extends StatelessWidget {
                   ),
                   IconButton(
                     key: const Key('close_loop_details_sheet_button'),
-                    icon: const Icon(
+                    constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                    tooltip: 'Close',
+                    icon: Icon(
                       Icons.close,
-                      color: CompozyColors.muted,
+                      color: palette.muted,
                       size: 20,
                     ),
                     onPressed: () => Navigator.of(context).pop(),
@@ -485,7 +461,7 @@ class LoopDetailsSheet extends StatelessWidget {
               ),
             ),
 
-            const Divider(color: CompozyColors.line, height: 1),
+            Divider(color: palette.line, height: 1),
 
             // Scrollable contract and input body
             Flexible(
@@ -495,10 +471,10 @@ class LoopDetailsSheet extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Description
-                    const Text(
+                    Text(
                       'DESCRIPTION',
                       style: TextStyle(
-                        color: CompozyColors.muted,
+                        color: palette.muted,
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 0.5,
@@ -507,8 +483,8 @@ class LoopDetailsSheet extends StatelessWidget {
                     const SizedBox(height: 6),
                     Text(
                       loop.description,
-                      style: const TextStyle(
-                        color: CompozyColors.fg,
+                      style: TextStyle(
+                        color: palette.fg,
                         fontSize: 14,
                         height: 1.4,
                       ),
@@ -516,24 +492,24 @@ class LoopDetailsSheet extends StatelessWidget {
                     const SizedBox(height: 20),
 
                     // Contract Section
-                    _buildContractSection(),
+                    _buildContractSection(context),
                     const SizedBox(height: 20),
 
                     // Input Schema Section
-                    _buildInputsSection(),
+                    _buildInputsSection(context),
                     const SizedBox(height: 24),
 
                     // Run Loop Action Button (Inverted Monochrome Pill)
                     SizedBox(
                       width: double.infinity,
-                      height: 44,
+                      height: 48,
                       child: ElevatedButton(
                         key: const Key('details_run_loop_button'),
                         onPressed: () {
                           Navigator.of(context).pop();
                           showModalBottomSheet<void>(
                             context: context,
-                            backgroundColor: CompozyColors.card,
+                            backgroundColor: palette.card,
                             isScrollControlled: true,
                             shape: const RoundedRectangleBorder(
                               borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -542,8 +518,8 @@ class LoopDetailsSheet extends StatelessWidget {
                           );
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: CompozyColors.primary,
-                          foregroundColor: CompozyColors.primaryInk,
+                          backgroundColor: palette.primary,
+                          foregroundColor: palette.primaryInk,
                           elevation: 0,
                           shape: const RoundedRectangleBorder(
                             borderRadius: CompozyRadius.pill,
@@ -551,16 +527,17 @@ class LoopDetailsSheet extends StatelessWidget {
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
+                          children: [
                             Icon(
                               Icons.play_arrow_rounded,
                               size: 16,
-                              color: CompozyColors.primaryInk,
+                              color: palette.primaryInk,
                             ),
-                            SizedBox(width: 6),
+                            const SizedBox(width: 6),
                             Text(
                               'Run Loop',
                               style: TextStyle(
+                                color: palette.primaryInk,
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -579,7 +556,8 @@ class LoopDetailsSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildContractSection() {
+  Widget _buildContractSection(BuildContext context) {
+    final palette = context.palette;
     final hasGoal = loop.goal.isNotEmpty;
     final hasDod = loop.definitionOfDone.isNotEmpty;
 
@@ -587,17 +565,17 @@ class LoopDetailsSheet extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-          children: const [
+          children: [
             Icon(
               Icons.assignment_outlined,
               size: 14,
-              color: CompozyColors.info,
+              color: palette.info,
             ),
-            SizedBox(width: 6),
+            const SizedBox(width: 6),
             Text(
               'CONTRACT',
               style: TextStyle(
-                color: CompozyColors.muted,
+                color: palette.muted,
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 0.5,
@@ -607,20 +585,20 @@ class LoopDetailsSheet extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         if (!hasGoal && !hasDod)
-          const Text(
+          Text(
             'No contract specified.',
             style: TextStyle(
-              color: CompozyColors.muted,
+              color: palette.muted,
               fontSize: 13,
               fontStyle: FontStyle.italic,
             ),
           )
         else ...[
           if (hasGoal) ...[
-            const Text(
+            Text(
               'Goal',
               style: TextStyle(
-                color: CompozyColors.fg,
+                color: palette.fg,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
@@ -631,14 +609,14 @@ class LoopDetailsSheet extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: CompozyColors.surface2,
+                color: palette.surface2,
                 borderRadius: CompozyRadius.input,
-                border: Border.all(color: CompozyColors.line, width: 1),
+                border: Border.all(color: palette.line, width: 1),
               ),
               child: Text(
                 loop.goal,
-                style: const TextStyle(
-                  color: CompozyColors.fg,
+                style: TextStyle(
+                  color: palette.fg,
                   fontSize: 13,
                   height: 1.4,
                 ),
@@ -647,10 +625,10 @@ class LoopDetailsSheet extends StatelessWidget {
             const SizedBox(height: 12),
           ],
           if (hasDod) ...[
-            const Text(
+            Text(
               'Definition of Done',
               style: TextStyle(
-                color: CompozyColors.fg,
+                color: palette.fg,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
@@ -661,14 +639,14 @@ class LoopDetailsSheet extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: CompozyColors.surface2,
+                color: palette.surface2,
                 borderRadius: CompozyRadius.input,
-                border: Border.all(color: CompozyColors.line, width: 1),
+                border: Border.all(color: palette.line, width: 1),
               ),
               child: Text(
                 loop.definitionOfDone,
-                style: const TextStyle(
-                  color: CompozyColors.fg,
+                style: TextStyle(
+                  color: palette.fg,
                   fontSize: 13,
                   height: 1.4,
                 ),
@@ -680,20 +658,21 @@ class LoopDetailsSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildInputsSection() {
+  Widget _buildInputsSection(BuildContext context) {
+    final palette = context.palette;
     final inputs = loop.inputs;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-          children: const [
-            Icon(Icons.input_outlined, size: 14, color: CompozyColors.info),
-            SizedBox(width: 6),
+          children: [
+            Icon(Icons.input_outlined, size: 14, color: palette.info),
+            const SizedBox(width: 6),
             Text(
               'INPUT SCHEMA',
               style: TextStyle(
-                color: CompozyColors.muted,
+                color: palette.muted,
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 0.5,
@@ -703,10 +682,10 @@ class LoopDetailsSheet extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         if (inputs.isEmpty)
-          const Text(
+          Text(
             'No input parameters required.',
             style: TextStyle(
-              color: CompozyColors.muted,
+              color: palette.muted,
               fontSize: 13,
               fontStyle: FontStyle.italic,
             ),
@@ -735,9 +714,9 @@ class LoopDetailsSheet extends StatelessWidget {
                 margin: const EdgeInsets.only(bottom: 8),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: CompozyColors.surface2,
+                  color: palette.surface2,
                   borderRadius: CompozyRadius.input,
-                  border: Border.all(color: CompozyColors.line, width: 1),
+                  border: Border.all(color: palette.line, width: 1),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -746,9 +725,9 @@ class LoopDetailsSheet extends StatelessWidget {
                       children: [
                         Text(
                           entry.key,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: 'monospace',
-                            color: CompozyColors.fgStrong,
+                            color: palette.fgStrong,
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                           ),
@@ -761,17 +740,17 @@ class LoopDetailsSheet extends StatelessWidget {
                               vertical: 1,
                             ),
                             decoration: BoxDecoration(
-                              color: CompozyColors.canvas,
+                              color: palette.canvas,
                               borderRadius: CompozyRadius.pill,
                               border: Border.all(
-                                color: CompozyColors.lineSoft,
+                                color: palette.lineSoft,
                               ),
                             ),
                             child: Text(
                               typeStr,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontFamily: 'monospace',
-                                color: CompozyColors.info,
+                                color: palette.info,
                                 fontSize: 11,
                               ),
                             ),
@@ -781,8 +760,8 @@ class LoopDetailsSheet extends StatelessWidget {
                           const Spacer(),
                           Text(
                             'default: $defaultStr',
-                            style: const TextStyle(
-                              color: CompozyColors.muted,
+                            style: TextStyle(
+                              color: palette.muted,
                               fontSize: 11,
                               fontFamily: 'monospace',
                             ),
@@ -794,8 +773,8 @@ class LoopDetailsSheet extends StatelessWidget {
                       const SizedBox(height: 6),
                       Text(
                         descStr,
-                        style: const TextStyle(
-                          color: CompozyColors.muted,
+                        style: TextStyle(
+                          color: palette.muted,
                           fontSize: 12,
                         ),
                       ),

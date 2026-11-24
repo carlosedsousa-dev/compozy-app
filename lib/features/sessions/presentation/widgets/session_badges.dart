@@ -2,6 +2,16 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/theme/compozy_theme.dart';
 
+/// Helper to determine whether a session lifecycle state requires user action / triage.
+bool isSessionAwaitingUser(String state) {
+  final s = state.toLowerCase().replaceAll('_', '-').trim();
+  return s == 'waiting' ||
+      s == 'needs-input' ||
+      s == 'needs you' ||
+      s == 'needs-you' ||
+      s == 'blocked';
+}
+
 /// Status badge pill reflecting session lifecycle state.
 /// Mirrors the status dots and badges in board.jpg and always-on.jpg.
 class StateBadge extends StatelessWidget {
@@ -11,46 +21,50 @@ class StateBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
     final Color badgeColor;
     final normalized = state.toLowerCase();
+    final isNeedsYou = isSessionAwaitingUser(state);
 
-    switch (normalized) {
-      case 'active':
-      case 'working':
-        badgeColor = CompozyColors.success; // Mint green (#34D399)
-        break;
-      case 'waiting':
-      case 'busy':
-        badgeColor = CompozyColors.warning; // Amber (#F5B14C)
-        break;
-      case 'needs you':
-      case 'needs_you':
-        badgeColor = CompozyColors.accent;  // Exclusive orange (#E8572A)
-        break;
-      case 'stopped':
-      case 'failed':
-      case 'canceled':
-        badgeColor = CompozyColors.danger;  // Rose / Red (#F87171)
-        break;
-      case 'idle':
-      case 'done':
-      default:
-        badgeColor = CompozyColors.subtle;  // Subtle gray (#707070)
-        break;
+    if (isNeedsYou) {
+      badgeColor = palette.accent;
+    } else {
+      switch (normalized) {
+        case 'active':
+        case 'working':
+          badgeColor = palette.success;
+          break;
+        case 'busy':
+        case 'queued':
+        case 'pending':
+          badgeColor = palette.warning;
+          break;
+        case 'stopped':
+        case 'failed':
+        case 'canceled':
+        case 'cancelled':
+          badgeColor = palette.danger;
+          break;
+        case 'idle':
+        case 'done':
+        default:
+          badgeColor = palette.subtle;
+          break;
+      }
     }
-
-    final isNeedsYou = normalized == 'needs you' || normalized == 'needs_you';
 
     return Container(
       key: Key('session_state_badge_$normalized'),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: isNeedsYou ? const Color(0xFF241510) : CompozyColors.surface2,
+        color: isNeedsYou
+            ? palette.accent.withValues(alpha: 0.12)
+            : palette.surface2,
         borderRadius: CompozyRadius.pill,
         border: Border.all(
           color: isNeedsYou
-              ? CompozyColors.accent.withValues(alpha: 0.5)
-              : CompozyColors.line,
+              ? palette.accent.withValues(alpha: 0.40)
+              : palette.line,
           width: 1,
         ),
       ),
@@ -69,7 +83,7 @@ class StateBadge extends StatelessWidget {
           Text(
             state,
             style: TextStyle(
-              color: isNeedsYou ? CompozyColors.accent : CompozyColors.fg,
+              color: isNeedsYou ? palette.accent : palette.fg,
               fontSize: 11,
               fontWeight: FontWeight.w500,
               letterSpacing: 0.1,
@@ -90,27 +104,29 @@ class AgentBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
+
     return Container(
       key: Key('session_agent_badge_$agent'),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: CompozyColors.surface2,
+        color: palette.surface2,
         borderRadius: CompozyRadius.pill,
-        border: Border.all(color: CompozyColors.line, width: 1),
+        border: Border.all(color: palette.line, width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
+          Icon(
             Icons.smart_toy_outlined,
             size: 11,
-            color: CompozyColors.info,
+            color: palette.info,
           ),
           const SizedBox(width: 4),
           Text(
             agent,
-            style: const TextStyle(
-              color: CompozyColors.fg,
+            style: TextStyle(
+              color: palette.fg,
               fontSize: 11,
               fontWeight: FontWeight.w500,
             ),
@@ -154,6 +170,7 @@ class AgentAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
     final bg = _resolveAvatarBg(agent);
 
     return Container(
@@ -162,13 +179,13 @@ class AgentAvatar extends StatelessWidget {
       decoration: BoxDecoration(
         color: bg,
         shape: BoxShape.circle,
-        border: Border.all(color: CompozyColors.line, width: 1),
+        border: Border.all(color: palette.line, width: 1),
       ),
       child: Center(
         child: Text(
           agent.isNotEmpty ? agent[0].toUpperCase() : 'A',
           style: TextStyle(
-            color: CompozyColors.fgStrong,
+            color: const Color(0xFFFFFFFF),
             fontSize: size * 0.46,
             fontWeight: FontWeight.w700,
           ),

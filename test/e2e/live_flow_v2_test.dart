@@ -368,8 +368,10 @@ void main() {
         // ---------------------------------------------------------------------
         // STEP 2: Settings Configuration & Persistence (US-005.AC-3, US-005.AC-4, US-010.AC-1)
         // ---------------------------------------------------------------------
-        // Navigate to Settings tab
-        await tester.tap(find.text('Settings'));
+        // Navigate to Settings via workspace menu
+        await tester.tap(find.byKey(const Key('app_workspace_menu_button')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('workspace_menu_settings_button')));
         await tester.pumpAndSettle();
 
         expect(find.text('Daemon Settings'), findsOneWidget);
@@ -427,6 +429,9 @@ void main() {
         // ---------------------------------------------------------------------
         // STEP 3: Sessions List & Details (US-001, US-002)
         // ---------------------------------------------------------------------
+        // Pop Settings screen back to shell
+        await tester.tap(find.byKey(const Key('settings_back_button')));
+        await tester.pumpAndSettle();
         await tester.tap(find.text('Sessions'));
         await tester.pumpAndSettle();
 
@@ -686,12 +691,18 @@ void main() {
         expect(find.text('Loops Catalog'), findsOneWidget);
         expect(find.text('implement-tasks'), findsOneWidget);
 
-        // Navigate to Settings tab via NavigationRail
-        await tester.tap(find.byIcon(Icons.tune));
+        // Navigate to Settings via workspace menu
+        await tester.tap(find.byKey(const Key('app_workspace_menu_button')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('workspace_menu_settings_button')));
         await tester.pumpAndSettle();
 
         expect(find.text('Daemon Settings'), findsOneWidget);
         expect(find.byKey(const Key('settings_base_url_field')), findsOneWidget);
+
+        // Pop Settings screen back to shell
+        await tester.tap(find.byKey(const Key('settings_back_button')));
+        await tester.pumpAndSettle();
 
         // Test theme switch in wide screen
         await tester.tap(find.byKey(const Key('app_shell_theme_toggle')));

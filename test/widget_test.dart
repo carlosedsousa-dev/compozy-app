@@ -2,9 +2,26 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'package:compozy_app/features/agents/data/agents_repository_provider.dart';
+import 'package:compozy_app/features/automations/data/automation_repository_impl.dart';
 import 'package:compozy_app/features/connection/presentation/connection_banner.dart';
+import 'package:compozy_app/features/loops/data/loop_repository_impl.dart';
 import 'package:compozy_app/features/sessions/data/session_repository_impl.dart';
 import 'package:compozy_app/main.dart';
+
+List<Override> _createOverrides() {
+  return [
+    sessionsProvider.overrideWith((ref) => Future.value(const [])),
+    loopsProvider.overrideWith((ref) => Future.value(const [])),
+    agentsPresenceProvider.overrideWith((ref) => Future.value(const [])),
+    automationJobsProvider.overrideWith((ref) => Future.value(const [])),
+    automationTriggersProvider.overrideWith((ref) => Future.value(const [])),
+    automationSchedulerProvider.overrideWith(
+      (ref) => Future.value(const SchedulerStatus()),
+    ),
+    connectionStatusProvider.overrideWith((ref) => Future.value(true)),
+  ];
+}
 
 void main() {
   testWidgets('AppNavigationShell renders mobile layout (< 600dp) with BottomNavigationBar', (tester) async {
@@ -14,10 +31,7 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          sessionsProvider.overrideWith((ref) => Future.value(const [])),
-          connectionStatusProvider.overrideWith((ref) => Future.value(true)),
-        ],
+        overrides: _createOverrides(),
         child: const MyApp(),
       ),
     );
@@ -33,16 +47,28 @@ void main() {
 
     // Verify nav destinations
     expect(find.text('Sessions'), findsOneWidget);
+    expect(find.text('Agents'), findsOneWidget);
     expect(find.text('Loops'), findsOneWidget);
-    expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('Automations'), findsOneWidget);
+
+    // Assert Settings is NOT inside BottomNavigationBar
+    expect(
+      find.descendant(
+        of: find.byType(BottomNavigationBar),
+        matching: find.text('Settings'),
+      ),
+      findsNothing,
+    );
 
     // Switch tab to Loops
     await tester.tap(find.text('Loops'));
     await tester.pumpAndSettle();
     expect(find.text('Loops Catalog'), findsOneWidget);
 
-    // Switch tab to Settings
-    await tester.tap(find.text('Settings'));
+    // Open workspace menu and navigate to Settings
+    await tester.tap(find.byKey(const Key('app_workspace_menu_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('workspace_menu_settings_button')));
     await tester.pumpAndSettle();
     expect(find.text('Daemon Settings'), findsOneWidget);
   });
@@ -54,10 +80,7 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          sessionsProvider.overrideWith((ref) => Future.value(const [])),
-          connectionStatusProvider.overrideWith((ref) => Future.value(true)),
-        ],
+        overrides: _createOverrides(),
         child: const MyApp(),
       ),
     );
@@ -73,7 +96,17 @@ void main() {
 
     // Verify rail destinations
     expect(find.text('Sessions'), findsOneWidget);
+    expect(find.text('Agents'), findsOneWidget);
     expect(find.text('Loops'), findsOneWidget);
-    expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('Automations'), findsOneWidget);
+
+    // Assert Settings is NOT in NavigationRail
+    expect(
+      find.descendant(
+        of: find.byType(NavigationRail),
+        matching: find.text('Settings'),
+      ),
+      findsNothing,
+    );
   });
 }

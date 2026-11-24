@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:material_ui/material_ui.dart';
 
+import '../../../../core/presentation/compozy_feedback.dart';
 import '../../../../core/theme/compozy_theme.dart';
 
 /// Human-in-the-Loop decision & permission approval card widget.
@@ -9,7 +10,7 @@ import '../../../../core/theme/compozy_theme.dart';
 /// - "Needs you" banner container with #E8572A at 12% alpha and 1px #E8572A at 30% alpha border
 /// - Solid 8x8dp #E8572A attention dot
 /// - Tool call name and description in clean typography
-/// - Primary action: Strictly monochrome inverted pill (#F5F5F5 bg, #0A0A0A bold text) for "Approve"
+/// - Primary action: Strictly monochrome inverted pill (#F5F5F5 bg, #0A0A0A bold text in dark) for "Approve"
 /// - Secondary action: Outlined pill for "Reject"
 ///
 /// Conforms to US-008.AC-1, US-008.AC-2, and REFERENCE_GUIDE.md.
@@ -37,15 +38,15 @@ class ApprovalCard extends StatelessWidget {
     this.isProcessing = false,
   });
 
-  Widget _buildNeedsYouBanner() {
+  Widget _buildNeedsYouBanner(CompozyPalette palette) {
     return Container(
       key: const Key('approval_card_needs_you_banner'),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: CompozyColors.accent.withValues(alpha: 0.12),
+        color: palette.accent.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
-          color: CompozyColors.accent.withValues(alpha: 0.30),
+          color: palette.accent.withValues(alpha: 0.30),
           width: 1,
         ),
       ),
@@ -56,16 +57,16 @@ class ApprovalCard extends StatelessWidget {
             key: const Key('approval_card_needs_you_dot'),
             width: 8,
             height: 8,
-            decoration: const BoxDecoration(
-              color: CompozyColors.accent,
+            decoration: BoxDecoration(
+              color: palette.accent,
               shape: BoxShape.circle,
             ),
           ),
           const SizedBox(width: 6),
-          const Text(
+          Text(
             'Needs you',
             style: TextStyle(
-              color: CompozyColors.accent,
+              color: palette.accent,
               fontSize: 12,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.2,
@@ -76,24 +77,24 @@ class ApprovalCard extends StatelessWidget {
     );
   }
 
-  Widget _buildToolHeader() {
+  Widget _buildToolHeader(CompozyPalette palette) {
     if (toolName == null || toolName!.isEmpty) {
       return const SizedBox.shrink();
     }
     return Row(
       children: [
-        const Icon(
+        Icon(
           Icons.terminal,
           size: 13,
-          color: CompozyColors.muted,
+          color: palette.muted,
         ),
         const SizedBox(width: 6),
         Text(
           'tool: $toolName',
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'monospace',
             fontSize: 12,
-            color: CompozyColors.fgStrong,
+            color: palette.fgStrong,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -101,18 +102,18 @@ class ApprovalCard extends StatelessWidget {
     );
   }
 
-  Widget _buildDescription() {
+  Widget _buildDescription(CompozyPalette palette) {
     return Text(
       description,
-      style: const TextStyle(
-        color: CompozyColors.fg,
+      style: TextStyle(
+        color: palette.fg,
         fontSize: 13,
         height: 1.45,
       ),
     );
   }
 
-  Widget _buildDetails() {
+  Widget _buildDetails(CompozyPalette palette) {
     if (details == null) return const SizedBox.shrink();
     String formatted;
     if (details is String) {
@@ -132,132 +133,154 @@ class ApprovalCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: CompozyColors.desk,
+        color: palette.desk,
         borderRadius: CompozyRadius.input,
-        border: Border.all(color: CompozyColors.line, width: 1),
+        border: Border.all(color: palette.line, width: 1),
       ),
       child: SelectableText(
         formatted,
-        style: const TextStyle(
+        style: TextStyle(
           fontFamily: 'monospace',
           fontSize: 11,
-          color: CompozyColors.muted,
+          color: palette.muted,
           height: 1.4,
         ),
       ),
     );
   }
 
-  Widget _buildActionButtons() {
+  Widget _buildActionButtons(BuildContext context, CompozyPalette palette) {
     if (isApproved != null) {
-      return _buildResolvedBadge(isApproved!);
+      return _buildResolvedBadge(palette, isApproved!);
     }
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        _buildRejectButton(),
+        _buildRejectButton(context, palette),
         const SizedBox(width: 10),
-        _buildApproveButton(),
+        _buildApproveButton(context, palette),
       ],
     );
   }
 
-  Widget _buildRejectButton() {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        key: const Key('approval_card_reject_button'),
-        borderRadius: CompozyRadius.pill,
-        onTap: isProcessing
-            ? null
-            : () {
-                onReject?.call();
-                onDecision?.call(false);
-              },
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.transparent,
-            borderRadius: CompozyRadius.pill,
-            border: Border.all(
-              color: const Color(0xFF383838),
-              width: 1,
-            ),
-          ),
-          child: const Text(
-            'Reject',
-            style: TextStyle(
-              color: CompozyColors.fg,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildApproveButton() {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        key: const Key('approval_card_approve_button'),
-        borderRadius: CompozyRadius.pill,
-        onTap: isProcessing
-            ? null
-            : () {
-                onApprove?.call();
-                onDecision?.call(true);
-              },
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-          decoration: const BoxDecoration(
-            color: CompozyColors.primary,
-            borderRadius: CompozyRadius.pill,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (isProcessing) ...[
-                const SizedBox(
-                  width: 12,
-                  height: 12,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: CompozyColors.primaryInk,
-                  ),
-                ),
-                const SizedBox(width: 6),
-              ],
-              const Text(
-                'Approve',
-                style: TextStyle(
-                  color: CompozyColors.primaryInk,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+  Widget _buildRejectButton(BuildContext context, CompozyPalette palette) {
+    return Semantics(
+      button: true,
+      label: 'Reject',
+      enabled: !isProcessing,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: const Key('approval_card_reject_button'),
+          borderRadius: CompozyRadius.pill,
+          onTap: isProcessing
+              ? null
+              : () {
+                  compozyHaptic();
+                  onReject?.call();
+                  onDecision?.call(false);
+                },
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48, minWidth: 80),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.transparent,
+                borderRadius: CompozyRadius.pill,
+                border: Border.all(
+                  color: palette.lineStrong,
+                  width: 1,
                 ),
               ),
-            ],
+              child: Center(
+                child: Text(
+                  'Reject',
+                  style: TextStyle(
+                    color: isProcessing ? palette.subtle : palette.fg,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildResolvedBadge(bool approved) {
+  Widget _buildApproveButton(BuildContext context, CompozyPalette palette) {
+    return Semantics(
+      button: true,
+      label: 'Approve',
+      enabled: !isProcessing,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: const Key('approval_card_approve_button'),
+          borderRadius: CompozyRadius.pill,
+          onTap: isProcessing
+              ? null
+              : () {
+                  compozyHaptic();
+                  onApprove?.call();
+                  onDecision?.call(true);
+                },
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48, minWidth: 80),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+              decoration: BoxDecoration(
+                color: isProcessing ? palette.surface2 : palette.primary,
+                borderRadius: CompozyRadius.pill,
+              ),
+              child: Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isProcessing) ...[
+                      SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: palette.primaryInk,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    Text(
+                      'Approve',
+                      style: TextStyle(
+                        color: isProcessing ? palette.subtle : palette.primaryInk,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResolvedBadge(CompozyPalette palette, bool approved) {
     return Container(
       key: Key('approval_card_resolved_${approved ? 'approved' : 'rejected'}'),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: approved
-            ? CompozyColors.success.withValues(alpha: 0.12)
-            : CompozyColors.danger.withValues(alpha: 0.12),
+            ? palette.success.withValues(alpha: 0.12)
+            : palette.surface2,
         borderRadius: CompozyRadius.pill,
         border: Border.all(
           color: approved
-              ? CompozyColors.success.withValues(alpha: 0.4)
-              : CompozyColors.danger.withValues(alpha: 0.4),
+              ? palette.success.withValues(alpha: 0.4)
+              : palette.lineStrong,
           width: 1,
         ),
       ),
@@ -265,15 +288,15 @@ class ApprovalCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            approved ? Icons.check_circle : Icons.cancel,
+            approved ? Icons.check_circle : Icons.cancel_outlined,
             size: 14,
-            color: approved ? CompozyColors.success : CompozyColors.danger,
+            color: approved ? palette.success : palette.muted,
           ),
           const SizedBox(width: 6),
           Text(
             approved ? 'Approved' : 'Rejected',
             style: TextStyle(
-              color: approved ? CompozyColors.success : CompozyColors.danger,
+              color: approved ? palette.success : palette.muted,
               fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
@@ -285,14 +308,16 @@ class ApprovalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
+
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: CompozyColors.card,
+        color: palette.card,
         borderRadius: CompozyRadius.card,
         border: Border.all(
-          color: CompozyColors.accent.withValues(alpha: 0.30),
+          color: palette.accent.withValues(alpha: 0.30),
           width: 1,
         ),
       ),
@@ -303,12 +328,12 @@ class ApprovalCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildNeedsYouBanner(),
+              _buildNeedsYouBanner(palette),
               if (title != null && title!.isNotEmpty)
                 Text(
                   title!,
-                  style: const TextStyle(
-                    color: CompozyColors.muted,
+                  style: TextStyle(
+                    color: palette.muted,
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
                   ),
@@ -317,16 +342,16 @@ class ApprovalCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           if (toolName != null && toolName!.isNotEmpty) ...[
-            _buildToolHeader(),
+            _buildToolHeader(palette),
             const SizedBox(height: 8),
           ],
-          _buildDescription(),
+          _buildDescription(palette),
           if (details != null) ...[
             const SizedBox(height: 10),
-            _buildDetails(),
+            _buildDetails(palette),
           ],
           const SizedBox(height: 14),
-          _buildActionButtons(),
+          _buildActionButtons(context, palette),
         ],
       ),
     );

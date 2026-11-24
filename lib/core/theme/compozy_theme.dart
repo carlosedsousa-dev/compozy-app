@@ -1,5 +1,9 @@
 import 'package:material_ui/material_ui.dart';
 
+import 'compozy_palette.dart';
+
+export 'compozy_palette.dart';
+
 /// Canonical CompozyOS Design System color tokens (Dark Mode).
 /// Pure chroma-free neutral dark palette, inverted monochrome primary actions,
 /// and semantic signal palette (strictly aligned with ds-core.css / reference images).
@@ -106,6 +110,7 @@ class CompozyTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
+      extensions: const [CompozyPalette.dark],
       scaffoldBackgroundColor: CompozyColors.desk,
       canvasColor: CompozyColors.canvas,
       colorScheme: const ColorScheme.dark(
@@ -206,6 +211,7 @@ class CompozyTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
+      extensions: const [CompozyPalette.light],
       scaffoldBackgroundColor: CompozyColorsLight.desk,
       canvasColor: CompozyColorsLight.canvas,
       colorScheme: const ColorScheme.light(

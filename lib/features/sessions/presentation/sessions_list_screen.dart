@@ -1,6 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../../core/presentation/widgets/compozy_empty_state.dart';
+import '../../../core/presentation/widgets/compozy_error_state.dart';
+import '../../../core/presentation/widgets/compozy_skeleton.dart';
 import '../../../core/theme/compozy_theme.dart';
 import '../../connection/presentation/connection_banner.dart';
 import '../data/session_repository_impl.dart';
@@ -9,8 +12,9 @@ import 'session_chat_screen.dart';
 import 'widgets/session_badges.dart';
 
 /// Screen displaying the list of active/idle/stopped CompozyOS sessions
-/// strictly styled after board.jpg and hero.jpg.
-class SessionsListScreen extends ConsumerWidget {
+/// strictly styled after board.jpg and hero.jpg, with "Needs you" attention triage,
+/// search filtering, and theme-aware design tokens.
+class SessionsListScreen extends ConsumerStatefulWidget {
   final ValueChanged<Session>? onSessionTap;
 
   const SessionsListScreen({
@@ -19,13 +23,34 @@ class SessionsListScreen extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SessionsListScreen> createState() => _SessionsListScreenState();
+}
+
+class _SessionsListScreenState extends ConsumerState<SessionsListScreen> {
+  late final TextEditingController _searchController;
+  String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
     final selectedFilter = ref.watch(sessionFilterProvider);
-    final filteredAsync = ref.watch(filteredSessionsProvider);
+    final sessionsAsync = ref.watch(sessionsProvider);
     final isOnline = ref.watch(connectionStatusProvider).value ?? true;
 
     return Scaffold(
-      backgroundColor: CompozyColors.desk,
+      backgroundColor: palette.desk,
       body: Column(
         children: [
           // Connection banner if offline
@@ -35,32 +60,74 @@ class SessionsListScreen extends ConsumerWidget {
               child: ConnectionBanner(),
             ),
 
+          // Search Field
+          _buildSearchField(palette),
+
           // Filter row
-          _buildFilterRow(context, ref, selectedFilter),
+          _buildFilterRow(context, ref, palette, selectedFilter),
 
           // Main list area with pull-to-refresh
           Expanded(
             child: RefreshIndicator(
               key: const Key('sessions_refresh_indicator'),
-              color: CompozyColors.fgStrong,
-              backgroundColor: CompozyColors.elevated,
+              color: palette.fgStrong,
+              backgroundColor: palette.elevated,
               onRefresh: () async {
                 ref.invalidate(sessionsProvider);
                 await ref.read(sessionsProvider.future);
               },
-              child: filteredAsync.when(
-                loading: () => const Center(
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: CompozyColors.fg,
-                  ),
+              child: sessionsAsync.when(
+                loading: () => const CompozySkeletonList(
+                  itemCount: 5,
+                  itemHeight: 96,
                 ),
-                error: (error, stack) => _buildErrorView(ref, error),
+                error: (error, stack) => CompozyErrorState(
+                  title: 'Failed to load sessions',
+                  message:
+                      "We couldn't reach the daemon. Check the connection and try again.",
+                  details: error.toString(),
+                  onRetry: () => ref.invalidate(sessionsProvider),
+                ),
                 data: (sessions) {
-                  if (sessions.isEmpty) {
-                    return _buildEmptyView();
+                  // 1. Filter by category chip
+                  final chipFiltered = sessions.where((s) {
+                    final normalized = selectedFilter.toLowerCase();
+                    if (normalized == 'all') return true;
+                    if (normalized == 'needs you' || normalized == 'needs_you') {
+                      return isSessionAwaitingUser(s.state);
+                    }
+                    return s.state.toLowerCase() == normalized;
+                  }).toList();
+
+                  // 2. Filter by search query
+                  final query = _searchQuery.trim().toLowerCase();
+                  final searchFiltered = query.isEmpty
+                      ? chipFiltered
+                      : chipFiltered.where((s) {
+                          return s.name.toLowerCase().contains(query) ||
+                              s.agent.toLowerCase().contains(query) ||
+                              s.id.toLowerCase().contains(query);
+                        }).toList();
+
+                  // 3. Sort: "Needs you" attention items first, then chronological
+                  final sortedSessions = List<Session>.from(searchFiltered);
+                  sortedSessions.sort((a, b) {
+                    final aNeeds = isSessionAwaitingUser(a.state);
+                    final bNeeds = isSessionAwaitingUser(b.state);
+                    if (aNeeds && !bNeeds) return -1;
+                    if (!aNeeds && bNeeds) return 1;
+                    return b.updatedAt.compareTo(a.updatedAt);
+                  });
+
+                  if (sortedSessions.isEmpty) {
+                    return _buildEmptyState(
+                      query: query,
+                      filter: selectedFilter,
+                      hasAnySessions: sessions.isNotEmpty,
+                    );
                   }
-                  return _buildSessionList(sessions);
+
+                  return _buildSessionList(sortedSessions);
                 },
               ),
             ),
@@ -70,35 +137,119 @@ class SessionsListScreen extends ConsumerWidget {
     );
   }
 
+  Widget _buildSearchField(CompozyPalette palette) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 2),
+      child: Container(
+        decoration: BoxDecoration(
+          color: palette.card,
+          borderRadius: CompozyRadius.input,
+          border: Border.all(color: palette.line, width: 1),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(
+          children: [
+            Icon(Icons.search, size: 18, color: palette.muted),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                key: const Key('sessions_search_field'),
+                controller: _searchController,
+                style: TextStyle(color: palette.fg, fontSize: 13),
+                cursorColor: palette.fgStrong,
+                decoration: InputDecoration(
+                  hintText: 'Search sessions by name, agent, or id...',
+                  hintStyle: TextStyle(color: palette.subtle, fontSize: 13),
+                  border: InputBorder.none,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value;
+                  });
+                },
+              ),
+            ),
+            if (_searchQuery.isNotEmpty)
+              Semantics(
+                button: true,
+                label: 'Clear search query',
+                child: IconButton(
+                  key: const Key('sessions_search_clear_button'),
+                  icon: Icon(Icons.clear, size: 16, color: palette.muted),
+                  tooltip: 'Clear search',
+                  constraints: const BoxConstraints(
+                    minWidth: 48,
+                    minHeight: 48,
+                  ),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() {
+                      _searchQuery = '';
+                    });
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildFilterRow(
     BuildContext context,
     WidgetRef ref,
+    CompozyPalette palette,
     String selectedFilter,
   ) {
-    const filters = ['All', 'Active', 'Idle', 'Stopped'];
+    const filters = ['All', 'Needs you', 'Active', 'Idle', 'Stopped'];
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
           children: filters.map((filter) {
             final isSelected =
                 selectedFilter.toLowerCase() == filter.toLowerCase();
+            final isNeedsYouChip = filter == 'Needs you';
 
             return Padding(
               padding: const EdgeInsets.only(right: 8),
               child: ChoiceChip(
-                key: Key('filter_chip_${filter.toLowerCase()}'),
-                label: Text(filter),
+                key: Key(
+                  'filter_chip_${filter.toLowerCase().replaceAll(' ', '_')}',
+                ),
+                label: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isNeedsYouChip) ...[
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: palette.accent,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                    ],
+                    Text(filter),
+                  ],
+                ),
                 selected: isSelected,
-                selectedColor: CompozyColors.elevated,
-                backgroundColor: CompozyColors.card,
+                selectedColor: isNeedsYouChip
+                    ? palette.accent.withValues(alpha: 0.16)
+                    : palette.elevated,
+                backgroundColor: palette.card,
                 side: BorderSide(
                   color: isSelected
-                      ? CompozyColors.lineStrong
-                      : CompozyColors.line,
+                      ? (isNeedsYouChip
+                          ? palette.accent.withValues(alpha: 0.5)
+                          : palette.lineStrong)
+                      : palette.line,
                   width: 1,
                 ),
                 shape: const RoundedRectangleBorder(
@@ -106,8 +257,8 @@ class SessionsListScreen extends ConsumerWidget {
                 ),
                 labelStyle: TextStyle(
                   color: isSelected
-                      ? CompozyColors.fgStrong
-                      : CompozyColors.muted,
+                      ? (isNeedsYouChip ? palette.accent : palette.fgStrong)
+                      : palette.muted,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                   fontSize: 13,
                 ),
@@ -136,8 +287,8 @@ class SessionsListScreen extends ConsumerWidget {
         return _SessionCard(
           session: session,
           onTap: () {
-            if (onSessionTap != null) {
-              onSessionTap!(session);
+            if (widget.onSessionTap != null) {
+              widget.onSessionTap!(session);
             } else {
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -151,124 +302,52 @@ class SessionsListScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildEmptyView() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: constraints.maxHeight),
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Icon(
-                      Icons.chat_bubble_outline,
-                      size: 44,
-                      color: CompozyColors.muted,
-                    ),
-                    SizedBox(height: 16),
-                    Text(
-                      'No sessions found',
-                      style: TextStyle(
-                        color: CompozyColors.fgStrong,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'No active or recorded sessions in this workspace.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: CompozyColors.muted,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
+  Widget _buildEmptyState({
+    required String query,
+    required String filter,
+    required bool hasAnySessions,
+  }) {
+    if (query.isNotEmpty) {
+      return CompozyEmptyState(
+        icon: Icons.search_off_outlined,
+        title: 'No matching sessions',
+        message: 'No sessions match "$query". Try a different search term.',
+        actionLabel: 'Clear search',
+        onAction: () {
+          _searchController.clear();
+          setState(() {
+            _searchQuery = '';
+          });
+        },
+      );
+    }
 
-  Widget _buildErrorView(WidgetRef ref, Object error) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: constraints.maxHeight),
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.error_outline,
-                      size: 44,
-                      color: CompozyColors.danger,
-                    ),
-                    SizedBox(height: 16),
-                    const Text(
-                      'Failed to load sessions',
-                      style: TextStyle(
-                        color: CompozyColors.fgStrong,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      error.toString(),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: CompozyColors.muted,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Monochrome inverted primary action button
-                    ElevatedButton(
-                      onPressed: () => ref.invalidate(sessionsProvider),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: CompozyColors.primary,
-                        foregroundColor: CompozyColors.primaryInk,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 10,
-                        ),
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: CompozyRadius.pill,
-                        ),
-                      ),
-                      child: const Text(
-                        'Retry',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
+    if (filter != 'All') {
+      return CompozyEmptyState(
+        icon: Icons.filter_alt_off_outlined,
+        title: 'No sessions found',
+        message: 'No sessions found with state "$filter".',
+        actionLabel: 'Clear filter',
+        onAction: () {
+          ref.read(sessionFilterProvider.notifier).state = 'All';
+        },
+      );
+    }
+
+    return CompozyEmptyState(
+      icon: Icons.chat_bubble_outline,
+      title: 'No sessions found',
+      message: 'No active or recorded sessions in this workspace.',
+      actionLabel: 'Refresh',
+      onAction: () {
+        ref.invalidate(sessionsProvider);
       },
     );
   }
 }
 
 /// Visual card representing one session in the list, strictly mirroring board.jpg.
+/// Prominently prioritizes session name and "Needs you" attention triage.
 class _SessionCard extends StatelessWidget {
   final Session session;
   final VoidCallback? onTap;
@@ -280,12 +359,20 @@ class _SessionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
+    final isNeedsYou = isSessionAwaitingUser(session.state);
+
     return Container(
       key: Key('session_card_${session.id}'),
       decoration: BoxDecoration(
-        color: CompozyColors.card,
+        color: palette.card,
         borderRadius: CompozyRadius.card,
-        border: Border.all(color: CompozyColors.line, width: 1),
+        border: Border.all(
+          color: isNeedsYou
+              ? palette.accent.withValues(alpha: 0.40)
+              : palette.line,
+          width: 1,
+        ),
       ),
       child: Material(
         color: Colors.transparent,
@@ -297,40 +384,28 @@ class _SessionCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top Header: Context tag + State badge
+                // Primary Line: Session Name prominently in high contrast + State badge
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: Text(
-                        session.id,
-                        style: const TextStyle(
-                          color: CompozyColors.subtle,
-                          fontSize: 11,
-                          fontFamily: 'monospace',
+                        session.name,
+                        style: TextStyle(
+                          color: palette.fgStrong,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -0.1,
                         ),
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(width: 8),
                     StateBadge(state: session.state),
                   ],
                 ),
-                const SizedBox(height: 8),
-
-                // Main Title: Session Name in high contrast
-                Text(
-                  session.name,
-                  style: const TextStyle(
-                    color: CompozyColors.fgStrong,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: -0.1,
-                  ),
-                ),
                 const SizedBox(height: 12),
 
-                // Bottom Footer: Agent Avatar + Agent pill + Relative timestamp
+                // Bottom Footer: Agent Avatar + Agent badge + demoted Monospace session.id + Relative timestamp
                 Row(
                   children: [
                     AgentAvatar(
@@ -340,11 +415,24 @@ class _SessionCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     AgentBadge(agent: session.agent),
-                    const Spacer(),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        session.id,
+                        textAlign: TextAlign.right,
+                        style: TextStyle(
+                          color: palette.subtle,
+                          fontSize: 11,
+                          fontFamily: 'monospace',
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     Text(
                       _formatRelativeTime(session.updatedAt),
-                      style: const TextStyle(
-                        color: CompozyColors.muted,
+                      style: TextStyle(
+                        color: palette.muted,
                         fontSize: 12,
                         fontWeight: FontWeight.w400,
                       ),

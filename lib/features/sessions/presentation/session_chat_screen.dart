@@ -2,10 +2,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/network/api_exceptions.dart';
+import '../../../core/presentation/compozy_feedback.dart';
+import '../../../core/presentation/widgets/compozy_empty_state.dart';
+import '../../../core/presentation/widgets/compozy_error_state.dart';
+import '../../../core/presentation/widgets/compozy_skeleton.dart';
 import '../../../core/theme/compozy_theme.dart';
 import '../data/session_repository_impl.dart';
 import '../domain/models/session.dart';
 import '../domain/models/turn.dart';
+import 'session_draft_provider.dart';
 import 'widgets/approval_card.dart';
 import 'widgets/chat_bubble.dart';
 import 'widgets/session_badges.dart';
@@ -32,10 +37,15 @@ class SessionChatScreen extends ConsumerStatefulWidget {
 class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   late final TextEditingController _promptController;
+  late final FocusNode _promptFocusNode;
   late final ScrollController _scrollController;
   final List<Turn> _optimisticTurns = [];
   bool _isSubmitting = false;
   bool _canSend = false;
+
+  // Scroll-to-latest and unread tracking
+  bool _showScrollToLatest = false;
+  bool _hasUnreadWhileAway = false;
 
   // Real-time live streaming state (US-006.AC-3, US-006.AC-4)
   String? _currentSessionState;
@@ -59,22 +69,33 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
   @override
   void initState() {
     super.initState();
-    _promptController = TextEditingController();
+    final initialDraft = ref.read(sessionDraftPromptProvider(widget.session.id));
+    _promptController = TextEditingController(text: initialDraft);
+    _promptFocusNode = FocusNode();
     _scrollController = ScrollController();
     _promptController.addListener(_onTextChanged);
+    _canSend = initialDraft.trim().isNotEmpty &&
+        !_isSessionBusy &&
+        !_isSessionStopped &&
+        !_isSubmitting;
   }
 
   @override
   void dispose() {
     _promptController.removeListener(_onTextChanged);
     _promptController.dispose();
+    _promptFocusNode.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
   void _onTextChanged() {
-    final hasContent = _promptController.text.trim().isNotEmpty;
-    final canSend = hasContent && !_isSessionBusy && !_isSessionStopped && !_isSubmitting;
+    final text = _promptController.text;
+    ref.read(sessionDraftPromptProvider(widget.session.id).notifier).state =
+        text;
+    final hasContent = text.trim().isNotEmpty;
+    final canSend =
+        hasContent && !_isSessionBusy && !_isSessionStopped && !_isSubmitting;
     if (canSend != _canSend) {
       setState(() {
         _canSend = canSend;
@@ -100,6 +121,8 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
       return;
     }
 
+    compozyHaptic();
+
     final optimisticTurn = Turn(
       turnId: 'optimistic_${DateTime.now().millisecondsSinceEpoch}',
       userMessage: text,
@@ -114,6 +137,8 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
       _canSend = false;
       _isSubmitting = true;
     });
+
+    ref.read(sessionDraftPromptProvider(widget.session.id).notifier).state = '';
 
     _scrollToBottom();
 
@@ -141,6 +166,9 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
           _isSubmitting = false;
         });
 
+        ref.read(sessionDraftPromptProvider(widget.session.id).notifier).state =
+            text;
+
         final String message;
         if (e is SessionBusyException) {
           message = 'Session is busy. Please wait before sending another prompt.';
@@ -150,25 +178,23 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
           message = 'Failed to send prompt: ${e.toString()}';
         }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: CompozyColors.danger,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        showCompozySnack(context, message, isError: true);
       }
     }
   }
 
   void _handleStreamEvent(SessionStreamEvent event) {
+    if (_showScrollToLatest) {
+      _hasUnreadWhileAway = true;
+    }
+
     if (event is SessionTextDeltaEvent) {
       setState(() {
         _isStreaming = true;
         _streamingTurnId ??= event.turnId;
         _streamingText = (_streamingText ?? '') + event.textDelta;
       });
-      _scrollToBottom();
+      if (!_showScrollToLatest) _scrollToBottom();
     } else if (event is SessionApprovalRequestEvent) {
       setState(() {
         final key = event.approvalId ??
@@ -176,27 +202,28 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
             'approval_${DateTime.now().millisecondsSinceEpoch}';
         _pendingApprovals[key] = event;
       });
-      _scrollToBottom();
+      if (!_showScrollToLatest) _scrollToBottom();
     } else if (event is SessionToolExecutionEvent) {
       if (event.isWaitingForApproval) {
         setState(() {
           final key = event.toolCallId ?? event.toolName;
           _pendingApprovals[key] = SessionApprovalRequestEvent(
             toolName: event.toolName,
-            description: 'Permission approval requested to execute ${event.toolName}.',
+            description:
+                'Permission approval requested to execute ${event.toolName}.',
             input: event.input,
             approvalId: event.toolCallId,
             sessionId: event.sessionId,
             turnId: event.turnId,
           );
         });
-        _scrollToBottom();
+        if (!_showScrollToLatest) _scrollToBottom();
       } else {
         setState(() {
           final key = event.toolCallId ?? event.toolName;
           _activeToolExecutions[key] = event;
         });
-        _scrollToBottom();
+        if (!_showScrollToLatest) _scrollToBottom();
       }
     } else if (event is SessionTurnEvent) {
       setState(() {
@@ -245,7 +272,7 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
           }
         }
       });
-      _scrollToBottom();
+      if (!_showScrollToLatest) _scrollToBottom();
     } else if (event is SessionTranscriptSnapshotEvent) {
       setState(() {
         _streamTurns = List.from(event.turns);
@@ -254,165 +281,12 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
         _activeToolExecutions.clear();
         _isStreaming = false;
       });
-      _scrollToBottom();
+      if (!_showScrollToLatest) _scrollToBottom();
     } else if (event is SessionStateChangedEvent) {
       setState(() {
         _currentSessionState = event.state;
       });
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    ref.listen<AsyncValue<SessionStreamEvent>>(
-      sessionStreamProvider(widget.session.id),
-      (previous, next) {
-        next.whenData((event) {
-          _handleStreamEvent(event);
-        });
-      },
-    );
-
-    final historyAsync = ref.watch(sessionHistoryProvider(widget.session.id));
-
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: isDark ? CompozyColors.desk : CompozyColorsLight.desk,
-      appBar: _buildTopAppBar(context),
-      endDrawer: SubagentsDrawer(
-        session: widget.session,
-        onClose: () => Navigator.of(context).maybePop(),
-      ),
-      body: Column(
-        children: [
-          // Guidance banner if session is in non-promptable state
-          if (_isSessionStopped)
-            _buildGuidanceBanner(
-              icon: Icons.stop_circle_outlined,
-              message: 'Session is stopped. Prompting is disabled.',
-              color: CompozyColors.danger,
-            )
-          else if (_isSessionBusy)
-            _buildGuidanceBanner(
-              icon: Icons.hourglass_top_outlined,
-              message: 'Session is currently busy running a turn.',
-              color: CompozyColors.warning,
-            ),
-
-          // Main transcript area
-          Expanded(
-            child: widget.initialTurns != null
-                ? _buildTranscriptView(widget.initialTurns!)
-                : historyAsync.when(
-                    loading: () => const Center(
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: CompozyColors.fg,
-                      ),
-                    ),
-                    error: (error, stack) => _buildErrorTranscript(error),
-                    data: (history) => _buildTranscriptView(history),
-                  ),
-          ),
-
-          // Docked prompt input bar container (mirrors hero.jpg)
-          _buildPromptInputBar(),
-        ],
-      ),
-    );
-  }
-
-  PreferredSizeWidget _buildTopAppBar(BuildContext context) {
-    return PreferredSize(
-      preferredSize: const Size.fromHeight(52),
-      child: Container(
-        decoration: const BoxDecoration(
-          color: CompozyColors.canvas,
-          border: Border(
-            bottom: BorderSide(color: Color(0xFF202020), width: 1),
-          ),
-        ),
-        child: AppBar(
-          toolbarHeight: 52,
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: IconButton(
-            key: const Key('chat_back_button'),
-            icon: const Icon(Icons.arrow_back, color: CompozyColors.fg, size: 20),
-            onPressed: () => Navigator.of(context).maybePop(),
-          ),
-          titleSpacing: 0,
-          title: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  widget.session.name,
-                  style: const TextStyle(
-                    color: CompozyColors.fgStrong,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 8),
-              AgentBadge(agent: widget.session.agent),
-              const SizedBox(width: 8),
-              StateBadge(state: _currentSessionState ?? widget.session.state),
-              const SizedBox(width: 4),
-              IconButton(
-                key: const Key('chat_subagents_button'),
-                icon: const Icon(
-                  Icons.account_tree_outlined,
-                  size: 20,
-                  color: CompozyColors.fg,
-                ),
-                tooltip: 'Subagents Hierarchy',
-                onPressed: () {
-                  _scaffoldKey.currentState?.openEndDrawer();
-                },
-              ),
-              const SizedBox(width: 8),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGuidanceBanner({
-    required IconData icon,
-    required String message,
-    required Color color,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: CompozyColors.surface2,
-        border: const Border(
-          bottom: BorderSide(color: CompozyColors.line, width: 1),
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 15, color: color),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: TextStyle(
-                color: color,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> _handleApprovalDecision({
@@ -434,31 +308,268 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
     } catch (_) {}
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(approved ? 'Tool execution approved.' : 'Tool execution rejected.'),
-          backgroundColor: approved ? CompozyColors.success : CompozyColors.muted,
-          behavior: SnackBarBehavior.floating,
-        ),
+      showCompozySnack(
+        context,
+        approved ? 'Tool execution approved.' : 'Tool execution rejected.',
+        isError: false,
       );
     }
   }
 
-  Widget _buildTranscriptView(List<Turn> turns) {
+  @override
+  Widget build(BuildContext context) {
+    ref.listen<AsyncValue<SessionStreamEvent>>(
+      sessionStreamProvider(widget.session.id),
+      (previous, next) {
+        next.whenData((event) {
+          _handleStreamEvent(event);
+        });
+      },
+    );
+
+    final palette = context.palette;
+    final historyAsync = ref.watch(sessionHistoryProvider(widget.session.id));
+
+    return Scaffold(
+      key: _scaffoldKey,
+      backgroundColor: palette.desk,
+      appBar: _buildTopAppBar(context, palette),
+      endDrawer: SubagentsDrawer(
+        session: widget.session,
+        onClose: () => Navigator.of(context).maybePop(),
+      ),
+      body: Column(
+        children: [
+          // Guidance banner if session is in non-promptable state
+          if (_isSessionStopped)
+            _buildGuidanceBanner(
+              palette: palette,
+              icon: Icons.stop_circle_outlined,
+              message: 'Session is stopped. Prompting is disabled.',
+              color: palette.danger,
+            )
+          else if (_isSessionBusy)
+            _buildGuidanceBanner(
+              palette: palette,
+              icon: Icons.hourglass_top_outlined,
+              message: 'Session is currently busy running a turn.',
+              color: palette.warning,
+            ),
+
+          // Main transcript area with Scroll-to-latest button overlay
+          Expanded(
+            child: Stack(
+              children: [
+                widget.initialTurns != null
+                    ? _buildTranscriptView(palette, widget.initialTurns!)
+                    : historyAsync.when(
+                        loading: () => const CompozySkeletonList(
+                          itemCount: 4,
+                          itemHeight: 80,
+                        ),
+                        error: (error, stack) => _buildErrorTranscript(error),
+                        data: (history) => _buildTranscriptView(palette, history),
+                      ),
+                if (_showScrollToLatest)
+                  Positioned(
+                    right: 16,
+                    bottom: 12,
+                    child: _buildScrollToLatestButton(palette),
+                  ),
+              ],
+            ),
+          ),
+
+          // Docked prompt input bar container (mirrors hero.jpg)
+          _buildPromptInputBar(palette),
+        ],
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildTopAppBar(
+    BuildContext context,
+    CompozyPalette palette,
+  ) {
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(52),
+      child: Container(
+        decoration: BoxDecoration(
+          color: palette.canvas,
+          border: Border(
+            bottom: BorderSide(color: palette.line, width: 1),
+          ),
+        ),
+        child: AppBar(
+          toolbarHeight: 52,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: Semantics(
+            button: true,
+            label: 'Back to sessions',
+            child: IconButton(
+              key: const Key('chat_back_button'),
+              icon: Icon(Icons.arrow_back, color: palette.fg, size: 20),
+              tooltip: 'Back to sessions',
+              constraints: const BoxConstraints(
+                minWidth: 48,
+                minHeight: 48,
+              ),
+              onPressed: () => Navigator.of(context).maybePop(),
+            ),
+          ),
+          titleSpacing: 0,
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  widget.session.name,
+                  style: TextStyle(
+                    color: palette.fgStrong,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              AgentBadge(agent: widget.session.agent),
+              const SizedBox(width: 8),
+              StateBadge(state: _currentSessionState ?? widget.session.state),
+              const SizedBox(width: 4),
+              Semantics(
+                button: true,
+                label: 'Subagents Hierarchy',
+                child: IconButton(
+                  key: const Key('chat_subagents_button'),
+                  icon: Icon(
+                    Icons.account_tree_outlined,
+                    size: 20,
+                    color: palette.fg,
+                  ),
+                  tooltip: 'Subagents Hierarchy',
+                  constraints: const BoxConstraints(
+                    minWidth: 48,
+                    minHeight: 48,
+                  ),
+                  onPressed: () {
+                    _scaffoldKey.currentState?.openEndDrawer();
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGuidanceBanner({
+    required CompozyPalette palette,
+    required IconData icon,
+    required String message,
+    required Color color,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: palette.surface2,
+        border: Border(
+          bottom: BorderSide(color: palette.line, width: 1),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 15, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScrollToLatestButton(CompozyPalette palette) {
+    return Semantics(
+      button: true,
+      label: 'Scroll to latest messages',
+      child: Material(
+        color: palette.elevated,
+        shape: const CircleBorder(),
+        elevation: 4,
+        child: InkWell(
+          key: const Key('chat_scroll_to_latest_button'),
+          customBorder: const CircleBorder(),
+          onTap: () {
+            setState(() {
+              _hasUnreadWhileAway = false;
+              _showScrollToLatest = false;
+            });
+            _scrollToBottom();
+          },
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+            child: Center(
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Icon(
+                    Icons.keyboard_arrow_down,
+                    color: palette.fgStrong,
+                    size: 22,
+                  ),
+                  if (_hasUnreadWhileAway)
+                    Positioned(
+                      top: 10,
+                      right: 10,
+                      child: Container(
+                        key: const Key('scroll_to_latest_unread_dot'),
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          color: palette.accent,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTranscriptView(CompozyPalette palette, List<Turn> turns) {
     final currentTurns = _streamTurns ?? turns;
     final allTurns = [...currentTurns, ..._optimisticTurns];
     final activeToolEvents = _activeToolExecutions.values.toList();
     final pendingApprovalEvents = _pendingApprovals.values.toList();
     final hasStreamingBubble =
         _streamingText != null && _streamingText!.isNotEmpty;
+    final isStreamingWaiting = _isStreaming &&
+        !hasStreamingBubble &&
+        activeToolEvents.isEmpty;
     final hasLiveItems = activeToolEvents.isNotEmpty ||
         hasStreamingBubble ||
-        pendingApprovalEvents.isNotEmpty;
+        pendingApprovalEvents.isNotEmpty ||
+        isStreamingWaiting;
 
     return RefreshIndicator(
       key: const Key('chat_refresh_indicator'),
-      color: CompozyColors.fgStrong,
-      backgroundColor: CompozyColors.elevated,
+      color: palette.fgStrong,
+      backgroundColor: palette.elevated,
       onRefresh: () async {
         ref.invalidate(sessionHistoryProvider(widget.session.id));
         await ref.read(sessionHistoryProvider(widget.session.id).future);
@@ -468,198 +579,178 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
       },
       child: (allTurns.isEmpty && !hasLiveItems)
           ? _buildEmptyTranscript()
-          : ListView.separated(
-              key: const Key('transcript_list_view'),
-              controller: _scrollController,
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-              itemCount: allTurns.length +
-                  activeToolEvents.length +
-                  (hasStreamingBubble ? 1 : 0) +
-                  pendingApprovalEvents.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 16),
-              itemBuilder: (context, index) {
-                if (index < allTurns.length) {
-                  final turn = allTurns[index];
-                  return TurnWidget(
-                    turn: turn,
-                    agentName: widget.session.agent,
-                    onApprovalDecision: (approved) => _handleApprovalDecision(
-                      approvalKey: turn.turnId,
-                      approved: approved,
-                      toolName: turn.toolCalls.isNotEmpty
-                          ? turn.toolCalls.first
-                          : null,
-                    ),
-                  );
+          : NotificationListener<ScrollNotification>(
+              onNotification: (notification) {
+                if (notification.metrics.maxScrollExtent > 0) {
+                  final distanceFromBottom =
+                      notification.metrics.maxScrollExtent -
+                          notification.metrics.pixels;
+                  final isAway = distanceFromBottom > 200;
+                  if (isAway != _showScrollToLatest) {
+                    setState(() {
+                      _showScrollToLatest = isAway;
+                      if (!isAway) {
+                        _hasUnreadWhileAway = false;
+                      }
+                    });
+                  }
                 }
-
-                final liveToolIndex = index - allTurns.length;
-                if (liveToolIndex < activeToolEvents.length) {
-                  final toolEvent = activeToolEvents[liveToolIndex];
-                  return ToolExecutionPill.fromEvent(toolEvent);
-                }
-
-                final afterLiveToolsIndex =
-                    liveToolIndex - activeToolEvents.length;
-                if (hasStreamingBubble && afterLiveToolsIndex == 0) {
-                  return AgentChatBubble(
-                    key: const Key('streaming_agent_bubble'),
-                    message: _streamingText!,
-                    agentName: widget.session.agent,
-                    isStreaming: true,
-                  );
-                }
-
-                final approvalIndex =
-                    afterLiveToolsIndex - (hasStreamingBubble ? 1 : 0);
-                if (approvalIndex >= 0 &&
-                    approvalIndex < pendingApprovalEvents.length) {
-                  final approvalEvent = pendingApprovalEvents[approvalIndex];
-                  final key = approvalEvent.approvalId ??
-                      approvalEvent.toolName ??
-                      'approval_$approvalIndex';
-                  return ApprovalCard(
-                    key: Key('live_approval_card_$key'),
-                    toolName: approvalEvent.toolName,
-                    description: approvalEvent.description,
-                    details: approvalEvent.input,
-                    onApprove: () => _handleApprovalDecision(
-                      approvalKey: key,
-                      approved: true,
-                      toolName: approvalEvent.toolName,
-                    ),
-                    onReject: () => _handleApprovalDecision(
-                      approvalKey: key,
-                      approved: false,
-                      toolName: approvalEvent.toolName,
-                    ),
-                  );
-                }
-
-                return const SizedBox.shrink();
+                return false;
               },
+              child: ListView.separated(
+                key: const Key('transcript_list_view'),
+                controller: _scrollController,
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                itemCount: allTurns.length +
+                    activeToolEvents.length +
+                    (hasStreamingBubble ? 1 : 0) +
+                    (isStreamingWaiting ? 1 : 0) +
+                    pendingApprovalEvents.length,
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 16),
+                itemBuilder: (context, index) {
+                  if (index < allTurns.length) {
+                    final turn = allTurns[index];
+                    return TurnWidget(
+                      turn: turn,
+                      agentName: widget.session.agent,
+                      onApprovalDecision: (approved) =>
+                          _handleApprovalDecision(
+                        approvalKey: turn.turnId,
+                        approved: approved,
+                        toolName: turn.toolCalls.isNotEmpty
+                            ? turn.toolCalls.first
+                            : null,
+                      ),
+                    );
+                  }
+
+                  final liveToolIndex = index - allTurns.length;
+                  if (liveToolIndex < activeToolEvents.length) {
+                    final toolEvent = activeToolEvents[liveToolIndex];
+                    return ToolExecutionPill.fromEvent(toolEvent);
+                  }
+
+                  final afterLiveToolsIndex =
+                      liveToolIndex - activeToolEvents.length;
+                  if (hasStreamingBubble && afterLiveToolsIndex == 0) {
+                    return AgentChatBubble(
+                      key: const Key('streaming_agent_bubble'),
+                      message: _streamingText!,
+                      agentName: widget.session.agent,
+                      isStreaming: true,
+                    );
+                  }
+
+                  if (isStreamingWaiting &&
+                      afterLiveToolsIndex == (hasStreamingBubble ? 1 : 0)) {
+                    return _buildThinkingIndicator(palette);
+                  }
+
+                  final approvalIndex = afterLiveToolsIndex -
+                      (hasStreamingBubble ? 1 : 0) -
+                      (isStreamingWaiting ? 1 : 0);
+                  if (approvalIndex >= 0 &&
+                      approvalIndex < pendingApprovalEvents.length) {
+                    final approvalEvent =
+                        pendingApprovalEvents[approvalIndex];
+                    final key = approvalEvent.approvalId ??
+                        approvalEvent.toolName ??
+                        'approval_$approvalIndex';
+                    return ApprovalCard(
+                      key: Key('live_approval_card_$key'),
+                      toolName: approvalEvent.toolName,
+                      description: approvalEvent.description,
+                      details: approvalEvent.input,
+                      onApprove: () => _handleApprovalDecision(
+                        approvalKey: key,
+                        approved: true,
+                        toolName: approvalEvent.toolName,
+                      ),
+                      onReject: () => _handleApprovalDecision(
+                        approvalKey: key,
+                        approved: false,
+                        toolName: approvalEvent.toolName,
+                      ),
+                    );
+                  }
+
+                  return const SizedBox.shrink();
+                },
+              ),
             ),
     );
   }
 
-  Widget _buildEmptyTranscript() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: constraints.maxHeight),
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Icon(
-                      Icons.chat_bubble_outline,
-                      size: 44,
-                      color: CompozyColors.muted,
-                    ),
-                    SizedBox(height: 16),
-                    Text(
-                      'No messages yet',
-                      style: TextStyle(
-                        color: CompozyColors.fgStrong,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Start the conversation by sending a prompt below.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: CompozyColors.muted,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
+  Widget _buildThinkingIndicator(CompozyPalette palette) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: palette.surface2,
+          borderRadius: CompozyRadius.pill,
+          border: Border.all(color: palette.line, width: 1),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 12,
+              height: 12,
+              child: CircularProgressIndicator(
+                strokeWidth: 1.5,
+                color: palette.muted,
               ),
             ),
-          ),
-        );
+            const SizedBox(width: 8),
+            Text(
+              'Thinking…',
+              style: TextStyle(
+                fontSize: 12,
+                color: palette.muted,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyTranscript() {
+    return CompozyEmptyState(
+      icon: Icons.chat_bubble_outline,
+      title: 'No messages yet',
+      message: 'Start the conversation by sending a prompt below.',
+      actionLabel: 'Inspect workspace',
+      onAction: () {
+        _promptController.text = 'Inspect workspace status and report';
+        _promptFocusNode.requestFocus();
+        _onTextChanged();
       },
     );
   }
 
   Widget _buildErrorTranscript(Object error) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: constraints.maxHeight),
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.error_outline,
-                      size: 44,
-                      color: CompozyColors.danger,
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Failed to load transcript',
-                      style: TextStyle(
-                        color: CompozyColors.fgStrong,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      error.toString(),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: CompozyColors.muted,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () => ref.invalidate(sessionHistoryProvider(widget.session.id)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: CompozyColors.primary,
-                        foregroundColor: CompozyColors.primaryInk,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: CompozyRadius.pill,
-                        ),
-                      ),
-                      child: const Text(
-                        'Retry',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
+    return CompozyErrorState(
+      title: 'Failed to load transcript',
+      message: "We couldn't reach the daemon to load conversation history.",
+      details: error.toString(),
+      onRetry: () => ref.invalidate(sessionHistoryProvider(widget.session.id)),
     );
   }
 
-  Widget _buildPromptInputBar() {
-    final isInputEnabled = !_isSessionBusy && !_isSessionStopped && !_isSubmitting;
+  Widget _buildPromptInputBar(CompozyPalette palette) {
+    final isInputEnabled =
+        !_isSessionBusy && !_isSessionStopped && !_isSubmitting;
 
     return Container(
-      decoration: const BoxDecoration(
-        color: CompozyColors.canvas,
+      decoration: BoxDecoration(
+        color: palette.canvas,
         border: Border(
-          top: BorderSide(color: Color(0xFF202020), width: 1),
+          top: BorderSide(color: palette.line, width: 1),
         ),
       ),
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
@@ -667,10 +758,10 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
         top: false,
         child: Container(
           decoration: BoxDecoration(
-            color: CompozyColors.card,
+            color: palette.card,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: isInputEnabled ? CompozyColors.line : CompozyColors.lineSoft,
+              color: isInputEnabled ? palette.line : palette.lineSoft,
               width: 1,
             ),
           ),
@@ -682,22 +773,25 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
               TextField(
                 key: const Key('prompt_input_field'),
                 controller: _promptController,
+                focusNode: _promptFocusNode,
                 enabled: isInputEnabled,
                 minLines: 1,
                 maxLines: 4,
                 textInputAction: TextInputAction.send,
                 onSubmitted: (_) => _sendPrompt(),
-                style: const TextStyle(
-                  color: CompozyColors.fg,
+                style: TextStyle(
+                  color: palette.fg,
                   fontSize: 14,
                 ),
-                cursorColor: CompozyColors.fgStrong,
+                cursorColor: palette.fgStrong,
                 decoration: InputDecoration(
                   hintText: _isSessionStopped
                       ? 'Session is stopped'
-                      : (_isSessionBusy ? 'Session is busy...' : 'Send a prompt to agent...'),
-                  hintStyle: const TextStyle(
-                    color: CompozyColors.subtle,
+                      : (_isSessionBusy
+                          ? 'Session is busy...'
+                          : 'Send a prompt to agent...'),
+                  hintStyle: TextStyle(
+                    color: palette.subtle,
                     fontSize: 14,
                   ),
                   contentPadding: const EdgeInsets.symmetric(vertical: 4),
@@ -712,33 +806,36 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
                 children: [
                   // Tool/capability indicator chips
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: CompozyColors.surface2,
+                      color: palette.surface2,
                       borderRadius: CompozyRadius.pill,
-                      border: Border.all(color: CompozyColors.line, width: 1),
+                      border: Border.all(color: palette.line, width: 1),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
-                      children: const [
+                      children: [
                         Icon(
                           Icons.auto_awesome,
                           size: 12,
-                          color: CompozyColors.info,
+                          color: palette.info,
                         ),
-                        SizedBox(width: 5),
+                        const SizedBox(width: 5),
                         Icon(
                           Icons.terminal,
                           size: 12,
-                          color: CompozyColors.muted,
+                          color: palette.muted,
                         ),
                       ],
                     ),
                   ),
                   const Spacer(),
 
-                  // Inverted primary send button (strictly monochrome #F5F5F5 / #0A0A0A)
-                  _buildSendButton(),
+                  // Inverted primary send button (strictly monochrome, ≥48dp touch target)
+                  _buildSendButton(palette),
                 ],
               ),
             ],
@@ -748,43 +845,58 @@ class _SessionChatScreenState extends ConsumerState<SessionChatScreen> {
     );
   }
 
-  Widget _buildSendButton() {
+  Widget _buildSendButton(CompozyPalette palette) {
     final isEnabled = _canSend;
 
-    return Container(
-      width: 32,
-      height: 32,
-      decoration: BoxDecoration(
-        color: isEnabled ? CompozyColors.primary : CompozyColors.surface2,
-        borderRadius: CompozyRadius.pill,
-        border: Border.all(
-          color: isEnabled ? CompozyColors.primary : CompozyColors.line,
-          width: 1,
-        ),
-      ),
+    return Semantics(
+      button: true,
+      label: 'Send prompt',
+      enabled: isEnabled,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           key: const Key('prompt_send_button'),
           borderRadius: CompozyRadius.pill,
-          onTap: isEnabled ? _sendPrompt : null,
-          child: Center(
-            child: _isSubmitting
-                ? const SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: CompozyColors.primaryInk,
-                    ),
-                  )
-                : Icon(
-                    Icons.arrow_upward,
-                    size: 17,
-                    color: isEnabled
-                        ? CompozyColors.primaryInk
-                        : CompozyColors.subtle,
+          onTap: isEnabled
+              ? () {
+                  compozyHaptic();
+                  _sendPrompt();
+                }
+              : null,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+            child: Center(
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: isEnabled ? palette.primary : palette.surface2,
+                  borderRadius: CompozyRadius.pill,
+                  border: Border.all(
+                    color: isEnabled ? palette.primary : palette.line,
+                    width: 1,
                   ),
+                ),
+                child: Center(
+                  child: _isSubmitting
+                      ? SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: palette.primaryInk,
+                          ),
+                        )
+                      : Icon(
+                          Icons.arrow_upward,
+                          size: 17,
+                          color: isEnabled
+                              ? palette.primaryInk
+                              : palette.subtle,
+                        ),
+                ),
+              ),
+            ),
           ),
         ),
       ),

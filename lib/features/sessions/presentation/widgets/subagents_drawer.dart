@@ -75,7 +75,10 @@ class SubagentsDrawer extends ConsumerWidget {
     this.onClose,
   });
 
-  List<SubagentItem> _flattenTree(List<SubagentItem> items, [int currentDepth = 0]) {
+  List<SubagentItem> _flattenTree(
+    List<SubagentItem> items, [
+    int currentDepth = 0,
+  ]) {
     final List<SubagentItem> result = [];
     for (final item in items) {
       final effectiveItem = item.depth != currentDepth
@@ -99,37 +102,31 @@ class SubagentsDrawer extends ConsumerWidget {
     return result;
   }
 
-  Color _getStatusDotColor(String state, bool isDark) {
+  Color _getStatusDotColor(String state, CompozyPalette palette) {
     switch (state.toLowerCase()) {
       case 'working':
       case 'active':
       case 'running':
-        return isDark ? CompozyColors.success : CompozyColorsLight.success;
+        return palette.success;
       case 'waiting':
       case 'busy':
       case 'queued':
       case 'pending':
-        return isDark ? CompozyColors.warning : CompozyColorsLight.warning;
+        return palette.warning;
       case 'stopped':
       case 'failed':
       case 'error':
       case 'killed':
       case 'cancelled':
-        return isDark ? CompozyColors.danger : CompozyColorsLight.danger;
+        return palette.danger;
       default:
-        return isDark ? CompozyColors.muted : CompozyColorsLight.muted;
+        return palette.muted;
     }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? CompozyColors.desk : CompozyColorsLight.desk;
-    final cardBg = isDark ? CompozyColors.card : CompozyColorsLight.card;
-    final borderColor = isDark ? CompozyColors.line : CompozyColorsLight.line;
-    final fgStrong = isDark ? CompozyColors.fgStrong : CompozyColorsLight.fgStrong;
-    final fg = isDark ? CompozyColors.fg : CompozyColorsLight.fg;
-    final muted = isDark ? CompozyColors.muted : CompozyColorsLight.muted;
+    final palette = context.palette;
 
     final List<SubagentItem> providedItems = subagents ??
         (session != null
@@ -144,14 +141,14 @@ class SubagentsDrawer extends ConsumerWidget {
 
     return Drawer(
       key: const Key('subagents_drawer'),
-      backgroundColor: bg,
+      backgroundColor: palette.desk,
       elevation: 0,
       shape: const RoundedRectangleBorder(),
       child: SafeArea(
         child: Container(
           decoration: BoxDecoration(
             border: Border(
-              left: BorderSide(color: borderColor, width: 1),
+              left: BorderSide(color: palette.line, width: 1),
             ),
           ),
           child: Column(
@@ -162,14 +159,18 @@ class SubagentsDrawer extends ConsumerWidget {
                 height: 56,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
-                  color: isDark ? CompozyColors.canvas : CompozyColorsLight.canvas,
+                  color: palette.canvas,
                   border: Border(
-                    bottom: BorderSide(color: borderColor, width: 1),
+                    bottom: BorderSide(color: palette.line, width: 1),
                   ),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.account_tree_outlined, size: 20, color: fgStrong),
+                    Icon(
+                      Icons.account_tree_outlined,
+                      size: 20,
+                      color: palette.fgStrong,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Row(
@@ -178,7 +179,7 @@ class SubagentsDrawer extends ConsumerWidget {
                             child: Text(
                               'Subagents Hierarchy',
                               style: TextStyle(
-                                color: fgStrong,
+                                color: palette.fgStrong,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -193,18 +194,19 @@ class SubagentsDrawer extends ConsumerWidget {
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
-                                color: isDark
-                                    ? CompozyColors.elevated
-                                    : CompozyColorsLight.elevated,
+                                color: palette.elevated,
                                 borderRadius: CompozyRadius.pill,
-                                border: Border.all(color: borderColor, width: 1),
+                                border: Border.all(
+                                  color: palette.line,
+                                  width: 1,
+                                ),
                               ),
                               child: Text(
                                 activeCount > 0
                                     ? '$activeCount active'
                                     : '${flatItems.length} lanes',
                                 style: TextStyle(
-                                  color: muted,
+                                  color: palette.muted,
                                   fontSize: 10,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -214,11 +216,20 @@ class SubagentsDrawer extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    IconButton(
-                      key: const Key('subagents_drawer_close'),
-                      icon: Icon(Icons.close, size: 20, color: fg),
-                      tooltip: 'Close Drawer',
-                      onPressed: onClose ?? () => Navigator.of(context).maybePop(),
+                    Semantics(
+                      button: true,
+                      label: 'Close Drawer',
+                      child: IconButton(
+                        key: const Key('subagents_drawer_close'),
+                        icon: Icon(Icons.close, size: 20, color: palette.fg),
+                        tooltip: 'Close Drawer',
+                        constraints: const BoxConstraints(
+                          minWidth: 48,
+                          minHeight: 48,
+                        ),
+                        onPressed: onClose ??
+                            () => Navigator.of(context).maybePop(),
+                      ),
                     ),
                   ],
                 ),
@@ -230,9 +241,9 @@ class SubagentsDrawer extends ConsumerWidget {
                   padding: const EdgeInsets.all(12),
                   margin: const EdgeInsets.fromLTRB(12, 12, 12, 4),
                   decoration: BoxDecoration(
-                    color: cardBg,
+                    color: palette.card,
                     borderRadius: CompozyRadius.card,
-                    border: Border.all(color: borderColor, width: 1),
+                    border: Border.all(color: palette.line, width: 1),
                   ),
                   child: Row(
                     children: [
@@ -240,16 +251,14 @@ class SubagentsDrawer extends ConsumerWidget {
                         width: 32,
                         height: 32,
                         decoration: BoxDecoration(
-                          color: isDark
-                              ? CompozyColors.surface2
-                              : CompozyColorsLight.surface2,
+                          color: palette.surface2,
                           borderRadius: CompozyRadius.input,
                         ),
                         child: Center(
                           child: Icon(
                             Icons.layers_outlined,
                             size: 18,
-                            color: fgStrong,
+                            color: palette.fgStrong,
                           ),
                         ),
                       ),
@@ -264,7 +273,7 @@ class SubagentsDrawer extends ConsumerWidget {
                                   child: Text(
                                     'Root Session',
                                     style: TextStyle(
-                                      color: muted,
+                                      color: palette.muted,
                                       fontSize: 10,
                                       fontWeight: FontWeight.w600,
                                       letterSpacing: 0.2,
@@ -280,7 +289,7 @@ class SubagentsDrawer extends ConsumerWidget {
                             Text(
                               session!.name,
                               style: TextStyle(
-                                color: fgStrong,
+                                color: palette.fgStrong,
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -293,11 +302,12 @@ class SubagentsDrawer extends ConsumerWidget {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Text(
                     'SPAWNED CHILD LANES',
                     style: TextStyle(
-                      color: muted,
+                      color: palette.muted,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.5,
@@ -309,23 +319,19 @@ class SubagentsDrawer extends ConsumerWidget {
               // Main Tree or Empty State
               Expanded(
                 child: flatItems.isEmpty
-                    ? _buildEmptyState(isDark, muted, fgStrong)
+                    ? _buildEmptyState(palette)
                     : ListView.separated(
                         key: const Key('subagents_list_view'),
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         itemCount: flatItems.length,
-                        separatorBuilder: (context, index) => const SizedBox(height: 6),
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: 6),
                         itemBuilder: (context, index) {
                           final item = flatItems[index];
                           return _buildSubagentItemRow(
                             context: context,
                             item: item,
-                            isDark: isDark,
-                            cardBg: cardBg,
-                            borderColor: borderColor,
-                            fgStrong: fgStrong,
-                            fg: fg,
-                            muted: muted,
+                            palette: palette,
                           );
                         },
                       ),
@@ -337,7 +343,7 @@ class SubagentsDrawer extends ConsumerWidget {
     );
   }
 
-  Widget _buildEmptyState(bool isDark, Color muted, Color fgStrong) {
+  Widget _buildEmptyState(CompozyPalette palette) {
     return Center(
       child: Padding(
         key: const Key('subagents_empty_state'),
@@ -349,20 +355,20 @@ class SubagentsDrawer extends ConsumerWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: isDark ? CompozyColors.surface2 : CompozyColorsLight.surface2,
+                color: palette.surface2,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.account_tree_outlined,
                 size: 24,
-                color: muted,
+                color: palette.muted,
               ),
             ),
             const SizedBox(height: 12),
             Text(
               'No Subagents Spawned',
               style: TextStyle(
-                color: fgStrong,
+                color: palette.fgStrong,
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
@@ -372,7 +378,7 @@ class SubagentsDrawer extends ConsumerWidget {
               'This session has not delegated work to child lanes.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: muted,
+                color: palette.muted,
                 fontSize: 12,
               ),
             ),
@@ -385,14 +391,9 @@ class SubagentsDrawer extends ConsumerWidget {
   Widget _buildSubagentItemRow({
     required BuildContext context,
     required SubagentItem item,
-    required bool isDark,
-    required Color cardBg,
-    required Color borderColor,
-    required Color fgStrong,
-    required Color fg,
-    required Color muted,
+    required CompozyPalette palette,
   }) {
-    final dotColor = _getStatusDotColor(item.state, isDark);
+    final dotColor = _getStatusDotColor(item.state, palette);
     final indentPadding = item.depth * 18.0;
 
     return Padding(
@@ -401,7 +402,7 @@ class SubagentsDrawer extends ConsumerWidget {
         right: 12.0,
       ),
       child: Material(
-        color: cardBg,
+        color: palette.card,
         borderRadius: CompozyRadius.card,
         child: InkWell(
           key: Key('subagent_item_${item.id}'),
@@ -412,7 +413,7 @@ class SubagentsDrawer extends ConsumerWidget {
             decoration: BoxDecoration(
               borderRadius: CompozyRadius.card,
               border: Border.all(
-                color: borderColor,
+                color: palette.line,
                 width: 1,
               ),
             ),
@@ -454,7 +455,7 @@ class SubagentsDrawer extends ConsumerWidget {
                         item.name,
                         key: Key('subagent_name_${item.id}'),
                         style: TextStyle(
-                          color: fgStrong,
+                          color: palette.fgStrong,
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                         ),
@@ -464,17 +465,18 @@ class SubagentsDrawer extends ConsumerWidget {
 
                     if (item.depth > 0)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 1,
+                        ),
                         decoration: BoxDecoration(
-                          color: isDark
-                              ? CompozyColors.surface2
-                              : CompozyColorsLight.surface2,
+                          color: palette.surface2,
                           borderRadius: CompozyRadius.pill,
                         ),
                         child: Text(
                           'L${item.depth}',
                           style: TextStyle(
-                            color: muted,
+                            color: palette.muted,
                             fontSize: 10,
                             fontWeight: FontWeight.w600,
                           ),
@@ -489,7 +491,7 @@ class SubagentsDrawer extends ConsumerWidget {
                   Text(
                     item.brief!,
                     style: TextStyle(
-                      color: fg,
+                      color: palette.fg,
                       fontSize: 12,
                     ),
                     maxLines: 2,
@@ -514,16 +516,17 @@ class SubagentsDrawer extends ConsumerWidget {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: isDark
-                                ? CompozyColors.canvasSoft
-                                : CompozyColorsLight.canvasSoft,
+                            color: palette.canvasSoft,
                             borderRadius: CompozyRadius.input,
-                            border: Border.all(color: borderColor, width: 1),
+                            border: Border.all(
+                              color: palette.line,
+                              width: 1,
+                            ),
                           ),
                           child: Text(
                             item.model!,
                             style: TextStyle(
-                              color: muted,
+                              color: palette.muted,
                               fontSize: 11,
                               fontFamily: 'monospace',
                               fontWeight: FontWeight.w500,
@@ -540,16 +543,17 @@ class SubagentsDrawer extends ConsumerWidget {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: isDark
-                                ? CompozyColors.surface2
-                                : CompozyColorsLight.surface2,
+                            color: palette.surface2,
                             borderRadius: CompozyRadius.input,
-                            border: Border.all(color: borderColor, width: 1),
+                            border: Border.all(
+                              color: palette.line,
+                              width: 1,
+                            ),
                           ),
                           child: Text(
                             item.runtimeTag!,
                             style: TextStyle(
-                              color: muted,
+                              color: palette.muted,
                               fontSize: 11,
                               fontFamily: 'monospace',
                             ),

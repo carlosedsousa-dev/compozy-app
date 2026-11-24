@@ -1,7 +1,9 @@
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../../../core/presentation/compozy_feedback.dart';
 import '../../../../core/theme/compozy_theme.dart';
 import '../../domain/models/turn.dart';
 import 'approval_card.dart';
@@ -44,6 +46,8 @@ class _PulsingCursorState extends State<PulsingCursor>
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
+
     return FadeTransition(
       opacity: Tween<double>(begin: 0.25, end: 1.0).animate(
         CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
@@ -53,7 +57,7 @@ class _PulsingCursorState extends State<PulsingCursor>
         height: 14,
         margin: const EdgeInsets.only(left: 2, top: 4),
         decoration: BoxDecoration(
-          color: CompozyColors.fgStrong,
+          color: palette.fgStrong,
           borderRadius: BorderRadius.circular(1.5),
         ),
       ),
@@ -62,7 +66,7 @@ class _PulsingCursorState extends State<PulsingCursor>
 }
 
 /// User chat bubble strictly styled with Compozy tokens:
-/// Right-aligned, `#232323` background, border `1px solid #2E2E2E`,
+/// Right-aligned, elevated background, subtle border,
 /// radius `16px` with bottom-right `4px` (mirrors hero.jpg and REFERENCE_GUIDE.md).
 class UserChatBubble extends StatelessWidget {
   final String message;
@@ -78,6 +82,8 @@ class UserChatBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
+
     return Align(
       alignment: Alignment.centerRight,
       child: ConstrainedBox(
@@ -87,12 +93,13 @@ class UserChatBubble extends StatelessWidget {
         child: Container(
           key: turnId != null ? Key('user_bubble_$turnId') : null,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: const BoxDecoration(
-            color: CompozyColors.elevated,
-            border: Border.fromBorderSide(
-              BorderSide(color: Color(0xFF2E2E2E), width: 1),
+          decoration: BoxDecoration(
+            color: palette.elevated,
+            border: Border.all(
+              color: palette.lineStrong,
+              width: 1,
             ),
-            borderRadius: BorderRadius.only(
+            borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(16),
               topRight: Radius.circular(16),
               bottomLeft: Radius.circular(16),
@@ -105,8 +112,8 @@ class UserChatBubble extends StatelessWidget {
             children: [
               Text(
                 message,
-                style: const TextStyle(
-                  color: CompozyColors.fg,
+                style: TextStyle(
+                  color: palette.fg,
                   fontSize: 14,
                   height: 1.4,
                 ),
@@ -116,19 +123,19 @@ class UserChatBubble extends StatelessWidget {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const SizedBox(
+                    SizedBox(
                       width: 10,
                       height: 10,
                       child: CircularProgressIndicator(
                         strokeWidth: 1.5,
-                        color: CompozyColors.muted,
+                        color: palette.muted,
                       ),
                     ),
                     const SizedBox(width: 5),
                     Text(
                       status == 'queued' ? 'Queued' : 'Running...',
-                      style: const TextStyle(
-                        color: CompozyColors.muted,
+                      style: TextStyle(
+                        color: palette.muted,
                         fontSize: 11,
                       ),
                     ),
@@ -144,8 +151,8 @@ class UserChatBubble extends StatelessWidget {
 }
 
 /// Agent chat bubble strictly styled with Compozy tokens:
-/// Left-aligned, includes circular agent avatar on the left, `#161616` container,
-/// border `1px solid #262626`, radius `14px` (mirrors hero.jpg and handoff.jpg).
+/// Left-aligned, includes circular agent avatar on the left, card container,
+/// subtle border, radius `14px`, and discoverable copy action (mirrors hero.jpg and handoff.jpg).
 class AgentChatBubble extends StatelessWidget {
   final String message;
   final String? turnId;
@@ -162,6 +169,7 @@ class AgentChatBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
     final effectiveAgent = agentName ?? 'agent';
 
     return Align(
@@ -180,17 +188,18 @@ class AgentChatBubble extends StatelessWidget {
             ),
             const SizedBox(width: 8),
 
-            // Message container with markdown
+            // Message container with markdown and discoverable copy action
             Expanded(
               child: Container(
                 key: turnId != null ? Key('agent_bubble_$turnId') : null,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                decoration: const BoxDecoration(
-                  color: CompozyColors.card,
-                  border: Border.fromBorderSide(
-                    BorderSide(color: CompozyColors.line, width: 1),
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+                decoration: BoxDecoration(
+                  color: palette.card,
+                  border: Border.all(
+                    color: palette.line,
+                    width: 1,
                   ),
-                  borderRadius: BorderRadius.only(
+                  borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(4),
                     topRight: Radius.circular(16),
                     bottomLeft: Radius.circular(16),
@@ -204,6 +213,62 @@ class AgentChatBubble extends StatelessWidget {
                     MarkdownView(text: message),
                     if (isStreaming)
                       const PulsingCursor(key: Key('streaming_typing_cursor')),
+                    if (!isStreaming && message.trim().isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Semantics(
+                            button: true,
+                            label: 'Copy message',
+                            child: InkWell(
+                              key: Key(
+                                'copy_agent_message_${turnId ?? "active"}',
+                              ),
+                              borderRadius: CompozyRadius.pill,
+                              onTap: () {
+                                Clipboard.setData(
+                                  ClipboardData(text: message),
+                                );
+                                showCompozySnack(
+                                  context,
+                                  'Message copied to clipboard',
+                                  isError: false,
+                                );
+                              },
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  minWidth: 48,
+                                  minHeight: 48,
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(8),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.copy_outlined,
+                                        size: 13,
+                                        color: palette.muted,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Copy',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: palette.muted,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -225,7 +290,8 @@ class MarkdownView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final blocks = _parseMarkdownBlocks(text);
+    final palette = context.palette;
+    final blocks = _parseMarkdownBlocks(context, palette, text);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -233,7 +299,11 @@ class MarkdownView extends StatelessWidget {
     );
   }
 
-  List<Widget> _parseMarkdownBlocks(String content) {
+  List<Widget> _parseMarkdownBlocks(
+    BuildContext context,
+    CompozyPalette palette,
+    String content,
+  ) {
     final widgets = <Widget>[];
     final lines = content.split('\n');
 
@@ -246,7 +316,14 @@ class MarkdownView extends StatelessWidget {
 
       if (line.trim().startsWith('```')) {
         if (inCodeBlock) {
-          widgets.add(_buildCodeBlock(codeBlockLines.join('\n'), codeLanguage));
+          widgets.add(
+            _buildCodeBlock(
+              context,
+              palette,
+              codeBlockLines.join('\n'),
+              codeLanguage,
+            ),
+          );
           codeBlockLines.clear();
           codeLanguage = null;
           inCodeBlock = false;
@@ -272,34 +349,68 @@ class MarkdownView extends StatelessWidget {
       }
 
       if (trimmed.startsWith('### ')) {
-        widgets.add(_buildHeading(trimmed.substring(4), 14, FontWeight.w600));
+        widgets.add(
+          _buildHeading(
+            palette,
+            trimmed.substring(4),
+            14,
+            FontWeight.w600,
+          ),
+        );
       } else if (trimmed.startsWith('## ')) {
-        widgets.add(_buildHeading(trimmed.substring(3), 15, FontWeight.w600));
+        widgets.add(
+          _buildHeading(
+            palette,
+            trimmed.substring(3),
+            15,
+            FontWeight.w600,
+          ),
+        );
       } else if (trimmed.startsWith('# ')) {
-        widgets.add(_buildHeading(trimmed.substring(2), 16, FontWeight.w700));
+        widgets.add(
+          _buildHeading(
+            palette,
+            trimmed.substring(2),
+            16,
+            FontWeight.w700,
+          ),
+        );
       } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-        widgets.add(_buildBulletPoint(trimmed.substring(2)));
+        widgets.add(_buildBulletPoint(palette, trimmed.substring(2)));
       } else {
-        widgets.add(_buildParagraph(trimmed));
+        widgets.add(_buildParagraph(palette, trimmed));
       }
     }
 
     if (inCodeBlock && codeBlockLines.isNotEmpty) {
-      widgets.add(_buildCodeBlock(codeBlockLines.join('\n'), codeLanguage));
+      widgets.add(
+        _buildCodeBlock(
+          context,
+          palette,
+          codeBlockLines.join('\n'),
+          codeLanguage,
+        ),
+      );
     }
 
     return widgets;
   }
 
-  Widget _buildHeading(String text, double fontSize, FontWeight fontWeight) {
+  Widget _buildHeading(
+    CompozyPalette palette,
+    String text,
+    double fontSize,
+    FontWeight fontWeight,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(top: 6, bottom: 4),
       child: Text.rich(
         TextSpan(
           children: _parseInlineSpans(
+            palette,
             text,
             baseStyle: TextStyle(
-              color: CompozyColors.fgStrong,
+              color: palette.fgStrong,
               fontSize: fontSize,
               fontWeight: fontWeight,
             ),
@@ -309,16 +420,16 @@ class MarkdownView extends StatelessWidget {
     );
   }
 
-  Widget _buildBulletPoint(String text) {
+  Widget _buildBulletPoint(CompozyPalette palette, String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4, left: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             '• ',
             style: TextStyle(
-              color: CompozyColors.muted,
+              color: palette.muted,
               fontSize: 14,
               fontWeight: FontWeight.bold,
             ),
@@ -327,9 +438,10 @@ class MarkdownView extends StatelessWidget {
             child: Text.rich(
               TextSpan(
                 children: _parseInlineSpans(
+                  palette,
                   text,
-                  baseStyle: const TextStyle(
-                    color: CompozyColors.fg,
+                  baseStyle: TextStyle(
+                    color: palette.fg,
                     fontSize: 14,
                     height: 1.4,
                   ),
@@ -342,15 +454,16 @@ class MarkdownView extends StatelessWidget {
     );
   }
 
-  Widget _buildParagraph(String text) {
+  Widget _buildParagraph(CompozyPalette palette, String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Text.rich(
         TextSpan(
           children: _parseInlineSpans(
+            palette,
             text,
-            baseStyle: const TextStyle(
-              color: CompozyColors.fg,
+            baseStyle: TextStyle(
+              color: palette.fg,
               fontSize: 14,
               height: 1.45,
             ),
@@ -360,40 +473,73 @@ class MarkdownView extends StatelessWidget {
     );
   }
 
-  Widget _buildCodeBlock(String code, String? language) {
+  Widget _buildCodeBlock(
+    BuildContext context,
+    CompozyPalette palette,
+    String code,
+    String? language,
+  ) {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.symmetric(vertical: 6),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: CompozyColors.desk,
+        color: palette.desk,
         borderRadius: CompozyRadius.input,
-        border: Border.all(color: CompozyColors.line, width: 1),
+        border: Border.all(color: palette.line, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (language != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Text(
-                language.toLowerCase(),
-                style: const TextStyle(
-                  color: CompozyColors.subtle,
-                  fontFamily: 'monospace',
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              if (language != null)
+                Text(
+                  language.toLowerCase(),
+                  style: TextStyle(
+                    color: palette.subtle,
+                    fontFamily: 'monospace',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                )
+              else
+                const SizedBox.shrink(),
+              Semantics(
+                button: true,
+                label: 'Copy code',
+                child: IconButton(
+                  icon: Icon(
+                    Icons.copy_outlined,
+                    size: 14,
+                    color: palette.muted,
+                  ),
+                  tooltip: 'Copy code',
+                  constraints: const BoxConstraints(
+                    minWidth: 48,
+                    minHeight: 48,
+                  ),
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: code));
+                    showCompozySnack(
+                      context,
+                      'Code copied to clipboard',
+                      isError: false,
+                    );
+                  },
                 ),
               ),
-            ),
+            ],
+          ),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: SelectableText(
               code,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'monospace',
                 fontSize: 13,
-                color: CompozyColors.fg,
+                color: palette.fg,
                 height: 1.4,
               ),
             ),
@@ -403,7 +549,11 @@ class MarkdownView extends StatelessWidget {
     );
   }
 
-  List<InlineSpan> _parseInlineSpans(String text, {required TextStyle baseStyle}) {
+  List<InlineSpan> _parseInlineSpans(
+    CompozyPalette palette,
+    String text, {
+    required TextStyle baseStyle,
+  }) {
     final spans = <InlineSpan>[];
     final pattern = RegExp(r'(\*\*(.*?)\*\*|\*(.*?)\*|`([^`]+)`|([^*`]+))');
     final matches = pattern.allMatches(text);
@@ -411,34 +561,42 @@ class MarkdownView extends StatelessWidget {
     for (final match in matches) {
       final raw = match.group(0) ?? '';
       if (raw.startsWith('**') && raw.endsWith('**') && raw.length >= 4) {
-        spans.add(TextSpan(
-          text: raw.substring(2, raw.length - 2),
-          style: baseStyle.copyWith(
-            fontWeight: FontWeight.bold,
-            color: CompozyColors.fgStrong,
+        spans.add(
+          TextSpan(
+            text: raw.substring(2, raw.length - 2),
+            style: baseStyle.copyWith(
+              fontWeight: FontWeight.bold,
+              color: palette.fgStrong,
+            ),
           ),
-        ));
+        );
       } else if (raw.startsWith('*') && raw.endsWith('*') && raw.length >= 2) {
-        spans.add(TextSpan(
-          text: raw.substring(1, raw.length - 1),
-          style: baseStyle.copyWith(
-            fontStyle: FontStyle.italic,
+        spans.add(
+          TextSpan(
+            text: raw.substring(1, raw.length - 1),
+            style: baseStyle.copyWith(
+              fontStyle: FontStyle.italic,
+            ),
           ),
-        ));
+        );
       } else if (raw.startsWith('`') && raw.endsWith('`') && raw.length >= 2) {
-        spans.add(TextSpan(
-          text: raw.substring(1, raw.length - 1),
-          style: baseStyle.copyWith(
-            fontFamily: 'monospace',
-            backgroundColor: CompozyColors.desk,
-            color: CompozyColors.fgStrong,
+        spans.add(
+          TextSpan(
+            text: raw.substring(1, raw.length - 1),
+            style: baseStyle.copyWith(
+              fontFamily: 'monospace',
+              backgroundColor: palette.desk,
+              color: palette.fgStrong,
+            ),
           ),
-        ));
+        );
       } else {
-        spans.add(TextSpan(
-          text: raw,
-          style: baseStyle,
-        ));
+        spans.add(
+          TextSpan(
+            text: raw,
+            style: baseStyle,
+          ),
+        );
       }
     }
 
@@ -451,7 +609,7 @@ class MarkdownView extends StatelessWidget {
 }
 
 /// Collapsible tool execution pill widget strictly styled with Compozy tokens:
-/// Monospace font, sunken surface (`#141414`), and 1px line border (mirrors handoff.jpg).
+/// Monospace font, sunken surface, and 1px line border (mirrors handoff.jpg).
 class ToolInvocationPills extends StatefulWidget {
   final List<String> toolCalls;
   final String turnId;
@@ -475,54 +633,78 @@ class _ToolInvocationPillsState extends State<ToolInvocationPills> {
       return const SizedBox.shrink();
     }
 
+    final palette = context.palette;
+    final summaryLabel = widget.toolCalls.length == 1
+        ? widget.toolCalls.first
+        : '${widget.toolCalls.length} tools executed';
+
     return Align(
       alignment: Alignment.centerLeft,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Header toggle pill
-          InkWell(
-            key: Key('tool_pill_toggle_${widget.turnId}'),
-            borderRadius: CompozyRadius.pill,
-            onTap: () {
-              setState(() {
-                _isExpanded = !_isExpanded;
-              });
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFF141414),
-                borderRadius: CompozyRadius.pill,
-                border: Border.all(color: CompozyColors.line, width: 1),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.terminal,
-                    size: 13,
-                    color: CompozyColors.muted,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    widget.toolCalls.length == 1
-                        ? widget.toolCalls.first
-                        : '${widget.toolCalls.length} tools executed',
-                    style: const TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 12,
-                      color: CompozyColors.muted,
+          // Header toggle pill with 48dp minimum touch target
+          Semantics(
+            button: true,
+            expanded: _isExpanded,
+            label: '$summaryLabel, ${_isExpanded ? "expanded" : "collapsed"}',
+            child: Material(
+              color: Colors.transparent,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 48),
+                child: Center(
+                  child: InkWell(
+                    key: Key('tool_pill_toggle_${widget.turnId}'),
+                    borderRadius: CompozyRadius.pill,
+                    onTap: () {
+                      setState(() {
+                        _isExpanded = !_isExpanded;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: palette.surface2,
+                        borderRadius: CompozyRadius.pill,
+                        border: Border.all(
+                          color: palette.line,
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.terminal,
+                            size: 13,
+                            color: palette.muted,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            summaryLabel,
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 12,
+                              color: palette.muted,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            _isExpanded
+                                ? Icons.keyboard_arrow_up
+                                : Icons.keyboard_arrow_down,
+                            size: 16,
+                            color: palette.muted,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 4),
-                  Icon(
-                    _isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                    size: 16,
-                    color: CompozyColors.muted,
-                  ),
-                ],
+                ),
               ),
             ),
           ),
@@ -538,27 +720,33 @@ class _ToolInvocationPillsState extends State<ToolInvocationPills> {
                 children: widget.toolCalls.map((tool) {
                   return Container(
                     key: Key('tool_call_${widget.turnId}_$tool'),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: CompozyColors.card,
+                      color: palette.card,
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: CompozyColors.line, width: 1),
+                      border: Border.all(
+                        color: palette.line,
+                        width: 1,
+                      ),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.code,
                           size: 11,
-                          color: CompozyColors.info,
+                          color: palette.info,
                         ),
                         const SizedBox(width: 4),
                         Text(
                           tool,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: 'monospace',
                             fontSize: 11,
-                            color: CompozyColors.fg,
+                            color: palette.fg,
                           ),
                         ),
                       ],

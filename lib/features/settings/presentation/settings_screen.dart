@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/network/health_checker.dart';
+import '../../../core/presentation/compozy_feedback.dart';
 import '../../../core/settings/settings.dart';
 import '../../../core/settings/settings_repository.dart';
 import '../../../core/theme/compozy_theme.dart';
@@ -10,7 +11,7 @@ import '../../connection/presentation/connection_banner.dart';
 
 /// Screen allowing the user to view and modify CompozyOS daemon settings,
 /// including Base URL, API Token, and active workspace, along with
-/// live connection testing and feedback.
+/// live connection testing, validation, and feedback.
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
@@ -30,6 +31,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool? _testConnectionSuccess;
   String? _testFeedbackMessage;
   bool _initialized = false;
+
+  static const _loopbackHosts = {
+    'localhost',
+    '127.0.0.1',
+    '10.0.2.2',
+    '::1',
+    '[::1]',
+  };
 
   @override
   void initState() {
@@ -105,12 +114,92 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  bool _isBreakingConnectivityChange(String oldUrl, String newUrl) {
+    final oldUri = Uri.tryParse(oldUrl.trim());
+    final newUri = Uri.tryParse(newUrl.trim());
+
+    if (oldUri == null || newUri == null) return false;
+    final oldHost = oldUri.host.toLowerCase();
+    final newHost = newUri.host.toLowerCase();
+
+    if (oldHost == newHost) return false;
+
+    // Both are local loopback aliases (e.g. host localhost <-> Android 10.0.2.2)
+    if (_loopbackHosts.contains(oldHost) && _loopbackHosts.contains(newHost)) {
+      return false;
+    }
+
+    // Host changed to a different remote endpoint
+    return true;
+  }
+
   Future<void> _saveSettings() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
     final rawBaseUrl = _baseUrlController.text.trim();
     final rawToken = _apiTokenController.text.trim();
     final rawWorkspace = _workspaceController.text.trim();
-
     final currentSettings = ref.read(settingsProvider);
+
+    // If changing base URL host to an external domain, require confirmation
+    if (_isBreakingConnectivityChange(currentSettings.baseUrl, rawBaseUrl)) {
+      final palette = context.palette;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          key: const Key('confirm_url_change_dialog'),
+          backgroundColor: palette.card,
+          shape: const RoundedRectangleBorder(
+            borderRadius: CompozyRadius.card,
+          ),
+          title: Text(
+            'Change Daemon URL?',
+            style: TextStyle(
+              color: palette.fgStrong,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          content: Text(
+            'Changing the daemon URL from "${currentSettings.baseUrl}" to "$rawBaseUrl" may disrupt active sessions and disconnect from the current daemon.',
+            style: TextStyle(
+              color: palette.muted,
+              fontSize: 13,
+              height: 1.4,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: palette.fgStrong,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              key: const Key('confirm_url_change_button'),
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: palette.primary,
+                foregroundColor: palette.primaryInk,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: CompozyRadius.pill,
+                ),
+              ),
+              child: const Text('Change URL'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) return;
+    }
+
     final updated = currentSettings.copyWith(
       baseUrl: rawBaseUrl.isNotEmpty ? rawBaseUrl : 'http://localhost:2123',
       apiToken: rawToken,
@@ -127,39 +216,68 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     ref.invalidate(connectionStatusProvider);
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          key: const Key('settings_saved_snackbar'),
-          content: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.check_circle, size: 16, color: CompozyColors.success),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Settings saved successfully',
-                  style: TextStyle(
-                    color: CompozyColors.fgStrong,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: CompozyColors.elevated,
-          behavior: SnackBarBehavior.floating,
-          shape: const RoundedRectangleBorder(
-            borderRadius: CompozyRadius.input,
-            side: BorderSide(color: CompozyColors.line, width: 1),
-          ),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      showCompozySnack(context, 'Settings saved successfully');
     }
   }
 
   Future<void> _resetDefaults() async {
+    final palette = context.palette;
+
+    // Destructive action confirmation dialog with safe cancel default
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        key: const Key('confirm_reset_defaults_dialog'),
+        backgroundColor: palette.card,
+        shape: const RoundedRectangleBorder(
+          borderRadius: CompozyRadius.card,
+        ),
+        title: Text(
+          'Reset Settings to Defaults?',
+          style: TextStyle(
+            color: palette.fgStrong,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        content: Text(
+          'This will reset the daemon Base URL, clear your API token, and active workspace identifier. This action cannot be undone.',
+          style: TextStyle(
+            color: palette.muted,
+            fontSize: 13,
+            height: 1.4,
+          ),
+        ),
+        actions: [
+          TextButton(
+            key: const Key('cancel_reset_defaults_button'),
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: palette.fgStrong,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            key: const Key('confirm_reset_defaults_button'),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: palette.danger,
+              foregroundColor: Colors.white,
+              shape: const RoundedRectangleBorder(
+                borderRadius: CompozyRadius.pill,
+              ),
+            ),
+            child: const Text('Reset to Defaults'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
     _baseUrlController.text = 'http://localhost:2123';
     _apiTokenController.text = '';
     _workspaceController.text = '';
@@ -176,34 +294,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         _testFeedbackMessage = null;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
-            'Settings reset to defaults',
-            style: TextStyle(color: CompozyColors.fgStrong, fontSize: 13),
-          ),
-          backgroundColor: CompozyColors.elevated,
-          behavior: SnackBarBehavior.floating,
-          shape: const RoundedRectangleBorder(
-            borderRadius: CompozyRadius.input,
-            side: BorderSide(color: CompozyColors.line, width: 1),
-          ),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      showCompozySnack(context, 'Settings reset to defaults');
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Listen to settings changes from repository / external updates
+    final palette = context.palette;
+
     ref.listen<Settings>(settingsProvider, (prev, next) {
       _syncFromSettings(next);
     });
 
     return Scaffold(
       key: const Key('settings_screen'),
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: palette.desk,
       body: LayoutBuilder(
         builder: (context, constraints) {
           final isWide = constraints.maxWidth >= 600;
@@ -223,17 +328,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _buildHeader(),
+                      _buildHeader(context),
                       const SizedBox(height: 16),
-                      _buildConnectionCard(),
+                      _buildConnectionCard(context),
                       const SizedBox(height: 16),
-                      _buildAuthCard(),
+                      _buildAuthCard(context),
                       const SizedBox(height: 16),
-                      _buildWorkspaceCard(),
+                      _buildWorkspaceCard(context),
                       const SizedBox(height: 16),
-                      _buildThemeCard(),
+                      _buildThemeCard(context),
                       const SizedBox(height: 20),
-                      _buildActions(),
+                      _buildActions(context),
                       const SizedBox(height: 24),
                     ],
                   ),
@@ -246,36 +351,41 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(BuildContext context) {
+    final palette = context.palette;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             Container(
-              width: 28,
-              height: 28,
+              width: 32,
+              height: 32,
               decoration: BoxDecoration(
-                color: CompozyColors.card,
+                color: palette.card,
                 borderRadius: CompozyRadius.input,
-                border: Border.all(color: CompozyColors.line, width: 1),
+                border: Border.all(color: palette.line, width: 1),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.tune,
-                size: 16,
-                color: CompozyColors.fgStrong,
+                size: 18,
+                color: palette.fgStrong,
               ),
             ),
             const SizedBox(width: 10),
-            const Expanded(
-              child: Text(
-                'Daemon Settings',
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: CompozyColors.fgStrong,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: -0.2,
+            Expanded(
+              child: Semantics(
+                header: true,
+                child: Text(
+                  'Daemon Settings',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: palette.fgStrong,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.2,
+                  ),
                 ),
               ),
             ),
@@ -283,14 +393,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: CompozyColors.elevated,
+                color: palette.elevated,
                 borderRadius: CompozyRadius.pill,
-                border: Border.all(color: CompozyColors.line, width: 1),
+                border: Border.all(color: palette.line, width: 1),
               ),
-              child: const Text(
+              child: Text(
                 'REST API',
                 style: TextStyle(
-                  color: CompozyColors.muted,
+                  color: palette.muted,
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.3,
@@ -300,10 +410,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ],
         ),
         const SizedBox(height: 6),
-        const Text(
+        Text(
           'Configure daemon connection, authentication, and active workspace.',
           style: TextStyle(
-            color: CompozyColors.muted,
+            color: palette.muted,
             fontSize: 13,
             height: 1.4,
           ),
@@ -312,33 +422,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _buildThemeCard() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBg = isDark ? CompozyColors.card : CompozyColorsLight.card;
-    final borderColor = isDark ? CompozyColors.line : CompozyColorsLight.line;
-    final fgStrong = isDark ? CompozyColors.fgStrong : CompozyColorsLight.fgStrong;
-    final muted = isDark ? CompozyColors.muted : CompozyColorsLight.muted;
+  Widget _buildThemeCard(BuildContext context) {
+    final palette = context.palette;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: cardBg,
+        color: palette.card,
         borderRadius: CompozyRadius.card,
-        border: Border.all(color: borderColor, width: 1),
+        border: Border.all(color: palette.line, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.palette_outlined, size: 16, color: fgStrong),
+              Icon(Icons.palette_outlined, size: 16, color: palette.fgStrong),
               const SizedBox(width: 8),
-              Text(
-                'Appearance & Theme',
-                style: TextStyle(
-                  color: fgStrong,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
+              Semantics(
+                header: true,
+                child: Text(
+                  'Appearance & Theme',
+                  style: TextStyle(
+                    color: palette.fgStrong,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
@@ -347,7 +456,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Text(
             'Select theme mode adhering to tokens-light.css and Compozy design tokens.',
             style: TextStyle(
-              color: muted,
+              color: palette.muted,
               fontSize: 12,
             ),
           ),
@@ -358,40 +467,45 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _buildConnectionCard() {
+  Widget _buildConnectionCard(BuildContext context) {
+    final palette = context.palette;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: CompozyColors.card,
+        color: palette.card,
         borderRadius: CompozyRadius.card,
-        border: Border.all(color: CompozyColors.line, width: 1),
+        border: Border.all(color: palette.line, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Text(
-                  'Daemon Connection',
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: CompozyColors.fgStrong,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                child: Semantics(
+                  header: true,
+                  child: Text(
+                    'Daemon Connection',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: palette.fgStrong,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
-              SizedBox(width: 8),
-              ConnectionBanner.compact(),
+              const SizedBox(width: 8),
+              const ConnectionBanner.compact(),
             ],
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'Base URL',
             style: TextStyle(
-              color: CompozyColors.muted,
+              color: palette.muted,
               fontSize: 12,
               fontWeight: FontWeight.w500,
             ),
@@ -400,45 +514,71 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           TextFormField(
             key: const Key('settings_base_url_field'),
             controller: _baseUrlController,
-            style: const TextStyle(
-              color: CompozyColors.fgStrong,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
+            style: TextStyle(
+              color: palette.fgStrong,
               fontSize: 13,
               fontFamily: 'monospace',
             ),
             decoration: InputDecoration(
               hintText: 'e.g. http://localhost:2123',
-              hintStyle: const TextStyle(
-                color: CompozyColors.subtle,
+              hintStyle: TextStyle(
+                color: palette.subtle,
                 fontSize: 13,
               ),
               filled: true,
-              fillColor: CompozyColors.surface2,
+              fillColor: palette.surface2,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 14,
                 vertical: 12,
               ),
               border: OutlineInputBorder(
                 borderRadius: CompozyRadius.input,
-                borderSide: const BorderSide(color: CompozyColors.line),
+                borderSide: BorderSide(color: palette.line),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: CompozyRadius.input,
-                borderSide: const BorderSide(color: CompozyColors.line),
+                borderSide: BorderSide(color: palette.line),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: CompozyRadius.input,
-                borderSide: const BorderSide(
-                  color: CompozyColors.fg,
+                borderSide: BorderSide(
+                  color: palette.fg,
                   width: 1.5,
                 ),
               ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: CompozyRadius.input,
+                borderSide: BorderSide(color: palette.danger),
+              ),
+              errorStyle: TextStyle(
+                color: palette.danger,
+                fontSize: 12,
+              ),
             ),
+            validator: (value) {
+              final trimmed = value?.trim() ?? '';
+              if (trimmed.isEmpty) {
+                return 'Daemon Base URL is required';
+              }
+              final uri = Uri.tryParse(trimmed);
+              if (uri == null || !uri.hasScheme || !uri.hasAuthority) {
+                return 'Enter a valid URL with scheme (e.g. http://localhost:2123)';
+              }
+              if (uri.scheme != 'http' && uri.scheme != 'https') {
+                return 'URL scheme must be http:// or https://';
+              }
+              if (uri.host.isEmpty) {
+                return 'URL must include a valid host';
+              }
+              return null;
+            },
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             'Default is http://localhost:2123 (use 10.0.2.2 for Android emulator).',
             style: TextStyle(
-              color: CompozyColors.subtle,
+              color: palette.subtle,
               fontSize: 11,
             ),
           ),
@@ -449,12 +589,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 key: const Key('settings_test_connection_button'),
                 onPressed: _isTestingConnection ? null : _testConnection,
                 icon: _isTestingConnection
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 14,
                         height: 14,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: CompozyColors.fg,
+                          color: palette.fg,
                         ),
                       )
                     : const Icon(Icons.wifi_tethering, size: 15),
@@ -466,9 +606,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: CompozyColors.fg,
-                  backgroundColor: CompozyColors.elevated,
-                  side: const BorderSide(color: CompozyColors.lineStrong),
+                  foregroundColor: palette.fg,
+                  backgroundColor: palette.elevated,
+                  minimumSize: const Size(88, 48),
+                  side: BorderSide(color: palette.lineStrong),
                   shape: const RoundedRectangleBorder(
                     borderRadius: CompozyRadius.pill,
                   ),
@@ -482,38 +623,40 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           if (_isTestingConnection || _testFeedbackMessage != null) ...[
             const SizedBox(height: 12),
-            _buildTestConnectionFeedback(),
+            _buildTestConnectionFeedback(context),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildTestConnectionFeedback() {
+  Widget _buildTestConnectionFeedback(BuildContext context) {
+    final palette = context.palette;
+
     if (_isTestingConnection) {
       return Container(
         key: const Key('connection_test_loading_banner'),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: CompozyColors.canvas,
+          color: palette.canvas,
           borderRadius: CompozyRadius.input,
-          border: Border.all(color: CompozyColors.line, width: 1),
+          border: Border.all(color: palette.line, width: 1),
         ),
-        child: const Row(
+        child: Row(
           children: [
             SizedBox(
               width: 12,
               height: 12,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                color: CompozyColors.fg,
+                color: palette.fg,
               ),
             ),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Text(
               'Testing daemon connectivity...',
               style: TextStyle(
-                color: CompozyColors.muted,
+                color: palette.muted,
                 fontSize: 12,
               ),
             ),
@@ -525,7 +668,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (_testFeedbackMessage != null) {
       final isSuccess = _testConnectionSuccess == true;
       final statusColor =
-          isSuccess ? CompozyColors.success : CompozyColors.danger;
+          isSuccess ? palette.success : palette.danger;
       final statusIcon =
           isSuccess ? Icons.check_circle_outline : Icons.error_outline;
 
@@ -535,7 +678,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             : 'connection_test_error_banner'),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: CompozyColors.canvas,
+          color: palette.canvas,
           borderRadius: CompozyRadius.input,
           border: Border.all(
             color: statusColor.withValues(alpha: 0.4),
@@ -564,30 +707,35 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return const SizedBox.shrink();
   }
 
-  Widget _buildAuthCard() {
+  Widget _buildAuthCard(BuildContext context) {
+    final palette = context.palette;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: CompozyColors.card,
+        color: palette.card,
         borderRadius: CompozyRadius.card,
-        border: Border.all(color: CompozyColors.line, width: 1),
+        border: Border.all(color: palette.line, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Authentication',
-            style: TextStyle(
-              color: CompozyColors.fgStrong,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
+          Semantics(
+            header: true,
+            child: Text(
+              'Authentication',
+              style: TextStyle(
+                color: palette.fgStrong,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'API Token',
             style: TextStyle(
-              color: CompozyColors.muted,
+              color: palette.muted,
               fontSize: 12,
               fontWeight: FontWeight.w500,
             ),
@@ -597,29 +745,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             key: const Key('settings_api_token_field'),
             controller: _apiTokenController,
             obscureText: _obscureToken,
-            style: const TextStyle(
-              color: CompozyColors.fgStrong,
+            style: TextStyle(
+              color: palette.fgStrong,
               fontSize: 13,
               fontFamily: 'monospace',
             ),
             decoration: InputDecoration(
               hintText: 'Optional Bearer token',
-              hintStyle: const TextStyle(
-                color: CompozyColors.subtle,
+              hintStyle: TextStyle(
+                color: palette.subtle,
                 fontSize: 13,
               ),
               filled: true,
-              fillColor: CompozyColors.surface2,
+              fillColor: palette.surface2,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 14,
                 vertical: 12,
               ),
               suffixIcon: IconButton(
                 key: const Key('settings_toggle_token_visibility'),
+                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                tooltip: _obscureToken ? 'Show API token' : 'Hide API token',
                 icon: Icon(
                   _obscureToken ? Icons.visibility_off : Icons.visibility,
                   size: 18,
-                  color: CompozyColors.muted,
+                  color: palette.muted,
                 ),
                 onPressed: () {
                   setState(() {
@@ -629,26 +779,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               border: OutlineInputBorder(
                 borderRadius: CompozyRadius.input,
-                borderSide: const BorderSide(color: CompozyColors.line),
+                borderSide: BorderSide(color: palette.line),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: CompozyRadius.input,
-                borderSide: const BorderSide(color: CompozyColors.line),
+                borderSide: BorderSide(color: palette.line),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: CompozyRadius.input,
-                borderSide: const BorderSide(
-                  color: CompozyColors.fg,
+                borderSide: BorderSide(
+                  color: palette.fg,
                   width: 1.5,
                 ),
               ),
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             'Required only when the daemon enforces session or gateway token auth.',
             style: TextStyle(
-              color: CompozyColors.subtle,
+              color: palette.subtle,
               fontSize: 11,
             ),
           ),
@@ -657,30 +807,35 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _buildWorkspaceCard() {
+  Widget _buildWorkspaceCard(BuildContext context) {
+    final palette = context.palette;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: CompozyColors.card,
+        color: palette.card,
         borderRadius: CompozyRadius.card,
-        border: Border.all(color: CompozyColors.line, width: 1),
+        border: Border.all(color: palette.line, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Workspace',
-            style: TextStyle(
-              color: CompozyColors.fgStrong,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
+          Semantics(
+            header: true,
+            child: Text(
+              'Workspace',
+              style: TextStyle(
+                color: palette.fgStrong,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'Active Workspace Identifier',
             style: TextStyle(
-              color: CompozyColors.muted,
+              color: palette.muted,
               fontSize: 12,
               fontWeight: FontWeight.w500,
             ),
@@ -689,44 +844,44 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           TextFormField(
             key: const Key('settings_workspace_field'),
             controller: _workspaceController,
-            style: const TextStyle(
-              color: CompozyColors.fgStrong,
+            style: TextStyle(
+              color: palette.fgStrong,
               fontSize: 13,
             ),
             decoration: InputDecoration(
               hintText: 'e.g. compozy-app or ws_3e99e4fe517eb344',
-              hintStyle: const TextStyle(
-                color: CompozyColors.subtle,
+              hintStyle: TextStyle(
+                color: palette.subtle,
                 fontSize: 13,
               ),
               filled: true,
-              fillColor: CompozyColors.surface2,
+              fillColor: palette.surface2,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 14,
                 vertical: 12,
               ),
               border: OutlineInputBorder(
                 borderRadius: CompozyRadius.input,
-                borderSide: const BorderSide(color: CompozyColors.line),
+                borderSide: BorderSide(color: palette.line),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: CompozyRadius.input,
-                borderSide: const BorderSide(color: CompozyColors.line),
+                borderSide: BorderSide(color: palette.line),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: CompozyRadius.input,
-                borderSide: const BorderSide(
-                  color: CompozyColors.fg,
+                borderSide: BorderSide(
+                  color: palette.fg,
                   width: 1.5,
                 ),
               ),
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             'Default workspace context sent with session creation and loop runs.',
             style: TextStyle(
-              color: CompozyColors.subtle,
+              color: palette.subtle,
               fontSize: 11,
             ),
           ),
@@ -735,7 +890,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _buildActions() {
+  Widget _buildActions(BuildContext context) {
+    final palette = context.palette;
+
     return Wrap(
       spacing: 12,
       runSpacing: 12,
@@ -746,8 +903,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           key: const Key('settings_save_button'),
           onPressed: _saveSettings,
           style: ElevatedButton.styleFrom(
-            backgroundColor: CompozyColors.primary,
-            foregroundColor: CompozyColors.primaryInk,
+            backgroundColor: palette.primary,
+            foregroundColor: palette.primaryInk,
+            minimumSize: const Size(88, 48),
             elevation: 0,
             shape: const RoundedRectangleBorder(
               borderRadius: CompozyRadius.pill,
@@ -768,7 +926,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           key: const Key('settings_reset_button'),
           onPressed: _resetDefaults,
           style: TextButton.styleFrom(
-            foregroundColor: CompozyColors.muted,
+            foregroundColor: palette.muted,
+            minimumSize: const Size(88, 48),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           ),
           child: const Text(

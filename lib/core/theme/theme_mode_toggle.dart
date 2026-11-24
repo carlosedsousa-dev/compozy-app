@@ -33,13 +33,14 @@ class ThemeModeToggle extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
     final currentMode = settings.themeMode;
+    final palette = context.palette;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (isSegmented) {
-      return _buildSegmentedSelector(context, ref, currentMode, isDark);
+      return _buildSegmentedSelector(context, ref, currentMode, palette);
     }
 
-    return _buildCompactToggle(context, ref, currentMode, isDark);
+    return _buildCompactToggle(context, ref, currentMode, isDark, palette);
   }
 
   Widget _buildCompactToggle(
@@ -47,25 +48,32 @@ class ThemeModeToggle extends ConsumerWidget {
     WidgetRef ref,
     ThemeMode currentMode,
     bool isDark,
+    CompozyPalette palette,
   ) {
     final isCurrentlyLight = currentMode == ThemeMode.light ||
         (currentMode == ThemeMode.system && !isDark);
+    final destinationTooltip =
+        isCurrentlyLight ? 'Switch to Dark Mode' : 'Switch to Light Mode';
 
-    return IconButton(
-      key: const Key('theme_mode_toggle'),
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-      tooltip: isCurrentlyLight ? 'Switch to Dark Mode' : 'Switch to Light Mode',
-      icon: Icon(
-        isCurrentlyLight ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
-        size: 18,
-        color: isDark ? CompozyColors.fg : CompozyColorsLight.fg,
+    return Semantics(
+      label: destinationTooltip,
+      button: true,
+      child: IconButton(
+        key: const Key('theme_mode_toggle'),
+        padding: const EdgeInsets.all(12),
+        constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+        tooltip: destinationTooltip,
+        icon: Icon(
+          isCurrentlyLight ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
+          size: 18,
+          color: palette.fg,
+        ),
+        onPressed: () {
+          final nextMode = isCurrentlyLight ? ThemeMode.dark : ThemeMode.light;
+          ref.read(settingsProvider.notifier).updateThemeMode(nextMode);
+          onThemeChanged?.call(nextMode);
+        },
       ),
-      onPressed: () {
-        final nextMode = isCurrentlyLight ? ThemeMode.dark : ThemeMode.light;
-        ref.read(settingsProvider.notifier).updateThemeMode(nextMode);
-        onThemeChanged?.call(nextMode);
-      },
     );
   }
 
@@ -73,13 +81,13 @@ class ThemeModeToggle extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     ThemeMode currentMode,
-    bool isDark,
+    CompozyPalette palette,
   ) {
-    final activeBg = isDark ? CompozyColors.primary : CompozyColorsLight.primary;
-    final activeFg = isDark ? CompozyColors.primaryInk : CompozyColorsLight.primaryInk;
-    final inactiveBg = isDark ? CompozyColors.surface2 : CompozyColorsLight.surface2;
-    final inactiveFg = isDark ? CompozyColors.muted : CompozyColorsLight.muted;
-    final borderColor = isDark ? CompozyColors.line : CompozyColorsLight.line;
+    final activeBg = palette.primary;
+    final activeFg = palette.primaryInk;
+    final inactiveBg = palette.surface2;
+    final inactiveFg = palette.muted;
+    final borderColor = palette.line;
 
     final options = [
       (ThemeMode.dark, 'Dark', Icons.dark_mode_outlined, const Key('theme_option_dark')),
@@ -113,26 +121,29 @@ class ThemeModeToggle extends ConsumerWidget {
                   ref.read(settingsProvider.notifier).updateThemeMode(mode);
                   onThemeChanged?.call(mode);
                 },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        icon,
-                        size: 15,
-                        color: isSelected ? activeFg : inactiveFg,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        label,
-                        style: TextStyle(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 48),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          icon,
+                          size: 15,
                           color: isSelected ? activeFg : inactiveFg,
-                          fontSize: 12,
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 6),
+                        Text(
+                          label,
+                          style: TextStyle(
+                            color: isSelected ? activeFg : inactiveFg,
+                            fontSize: 12,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

@@ -291,8 +291,10 @@ void main() {
 
         // Verify bottom navigation bar exists with destinations
         expect(find.text('Sessions'), findsOneWidget);
+        expect(find.text('Agents'), findsOneWidget);
         expect(find.text('Loops'), findsOneWidget);
-        expect(find.text('Settings'), findsOneWidget);
+        expect(find.text('Automations'), findsOneWidget);
+        expect(find.text('Settings'), findsNothing);
 
         // ---------------------------------------------------------------------
         // STEP 2: Sessions List display and filtering (US-002.AC-1)

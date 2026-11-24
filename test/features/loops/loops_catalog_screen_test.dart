@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'package:compozy_app/core/theme/compozy_theme.dart';
 import 'package:compozy_app/features/connection/presentation/connection_banner.dart';
 import 'package:compozy_app/features/loops/data/loop_repository_impl.dart';
 import 'package:compozy_app/features/loops/domain/loop_definition.dart';
@@ -71,8 +74,9 @@ void main() {
             loopsProvider.overrideWith((ref) => Future.value(testLoops)),
             connectionStatusProvider.overrideWith((ref) => Future.value(true)),
           ],
-          child: const MaterialApp(
-            home: LoopsCatalogScreen(),
+          child: MaterialApp(
+            theme: CompozyTheme.darkTheme,
+            home: const LoopsCatalogScreen(),
           ),
         ),
       );
@@ -118,6 +122,38 @@ void main() {
       expect(find.text('Contract'), findsWidgets);
     });
 
+    testWidgets('renders skeleton loading cards without bare spinner (AUD-003)',
+        (tester) async {
+      final completer = Completer<List<LoopDefinition>>();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            loopsProvider.overrideWith((ref) => completer.future),
+            connectionStatusProvider.overrideWith((ref) => Future.value(true)),
+          ],
+          child: MaterialApp(
+            theme: CompozyTheme.darkTheme,
+            home: const LoopsCatalogScreen(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+
+      // Verify skeletons rendered and bare spinner absent
+      expect(find.byKey(const Key('loops_loading_skeletons')), findsOneWidget);
+      expect(find.byType(LoopCardSkeleton), findsWidgets);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+
+      // Complete future and verify transition
+      completer.complete(testLoops);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('loops_loading_skeletons')), findsNothing);
+      expect(find.text('council'), findsOneWidget);
+    });
+
     testWidgets(
         'shows details bottom sheet with contract goal, definition of done, and inputs on card tap (US-004.AC-2)',
         (tester) async {
@@ -127,8 +163,9 @@ void main() {
             loopsProvider.overrideWith((ref) => Future.value(testLoops)),
             connectionStatusProvider.overrideWith((ref) => Future.value(true)),
           ],
-          child: const MaterialApp(
-            home: LoopsCatalogScreen(),
+          child: MaterialApp(
+            theme: CompozyTheme.darkTheme,
+            home: const LoopsCatalogScreen(),
           ),
         ),
       );
@@ -178,8 +215,9 @@ void main() {
             loopsProvider.overrideWith((ref) => Future.value(const [])),
             connectionStatusProvider.overrideWith((ref) => Future.value(true)),
           ],
-          child: const MaterialApp(
-            home: LoopsCatalogScreen(),
+          child: MaterialApp(
+            theme: CompozyTheme.darkTheme,
+            home: const LoopsCatalogScreen(),
           ),
         ),
       );
@@ -194,6 +232,50 @@ void main() {
       );
     });
 
+    testWidgets('empty state reset filter action restores all loops',
+        (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            loopsProvider.overrideWith((ref) => Future.value(testLoops)),
+            connectionStatusProvider.overrideWith((ref) => Future.value(true)),
+          ],
+          child: MaterialApp(
+            theme: CompozyTheme.lightTheme,
+            home: const LoopsCatalogScreen(),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Select 'Automation' chip
+      await tester.tap(find.byKey(const Key('filter_chip_automation')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('overnight'), findsOneWidget);
+      expect(find.text('council'), findsNothing);
+
+      // Now override with empty results for automation to trigger empty state in category
+      final element = tester.element(find.byType(LoopsCatalogScreen));
+      final container = ProviderScope.containerOf(element);
+      container.read(loopCategoryFilterProvider.notifier).state = 'NonExistentCategory';
+      await tester.pumpAndSettle();
+
+      // Verify empty state for category is shown with 'Reset Filter' button
+      expect(find.byKey(const Key('loops_empty_view')), findsOneWidget);
+      expect(find.text('Reset Filter'), findsOneWidget);
+
+      // Tap Reset Filter
+      await tester.tap(find.text('Reset Filter'));
+      await tester.pumpAndSettle();
+
+      // Verify filter reset to All and all loops restored
+      expect(find.text('council'), findsOneWidget);
+      expect(find.text('overnight'), findsOneWidget);
+      expect(find.text('deliver-phases'), findsOneWidget);
+    });
+
     testWidgets('handles pull-to-refresh trigger', (tester) async {
       int fetchCount = 0;
 
@@ -206,8 +288,9 @@ void main() {
             }),
             connectionStatusProvider.overrideWith((ref) => Future.value(true)),
           ],
-          child: const MaterialApp(
-            home: LoopsCatalogScreen(),
+          child: MaterialApp(
+            theme: CompozyTheme.darkTheme,
+            home: const LoopsCatalogScreen(),
           ),
         ),
       );
@@ -241,8 +324,9 @@ void main() {
             }),
             connectionStatusProvider.overrideWith((ref) => Future.value(true)),
           ],
-          child: const MaterialApp(
-            home: LoopsCatalogScreen(),
+          child: MaterialApp(
+            theme: CompozyTheme.darkTheme,
+            home: const LoopsCatalogScreen(),
           ),
         ),
       );
@@ -269,8 +353,9 @@ void main() {
             loopsProvider.overrideWith((ref) => Future.value(testLoops)),
             connectionStatusProvider.overrideWith((ref) => Future.value(true)),
           ],
-          child: const MaterialApp(
-            home: LoopsCatalogScreen(),
+          child: MaterialApp(
+            theme: CompozyTheme.darkTheme,
+            home: const LoopsCatalogScreen(),
           ),
         ),
       );
@@ -310,8 +395,9 @@ void main() {
             loopsProvider.overrideWith((ref) => Future.value(testLoops)),
             connectionStatusProvider.overrideWith((ref) => Future.value(true)),
           ],
-          child: const MaterialApp(
-            home: LoopsCatalogScreen(),
+          child: MaterialApp(
+            theme: CompozyTheme.darkTheme,
+            home: const LoopsCatalogScreen(),
           ),
         ),
       );
@@ -321,7 +407,7 @@ void main() {
       expect(find.byKey(const Key('loops_grid_view')), findsNothing);
     });
 
-    testWidgets('renders desktop layout (>=600dp) with GridView',
+    testWidgets('renders desktop layout (>=600dp) with GridView without text scale overflow',
         (tester) async {
       tester.view.physicalSize = const Size(1024, 768);
       tester.view.devicePixelRatio = 1.0;
@@ -333,8 +419,15 @@ void main() {
             loopsProvider.overrideWith((ref) => Future.value(testLoops)),
             connectionStatusProvider.overrideWith((ref) => Future.value(true)),
           ],
-          child: const MaterialApp(
-            home: LoopsCatalogScreen(),
+          child: MaterialApp(
+            theme: CompozyTheme.darkTheme,
+            home: MediaQuery(
+              data: const MediaQueryData(
+                size: Size(1024, 768),
+                textScaler: TextScaler.linear(1.8),
+              ),
+              child: const LoopsCatalogScreen(),
+            ),
           ),
         ),
       );
@@ -342,6 +435,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('loops_grid_view')), findsOneWidget);
       expect(find.byKey(const Key('loops_list_view')), findsNothing);
+      // Ensure no overflow errors occurred
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('custom onLoopTap callback triggers when provided',
@@ -355,6 +450,7 @@ void main() {
             connectionStatusProvider.overrideWith((ref) => Future.value(true)),
           ],
           child: MaterialApp(
+            theme: CompozyTheme.darkTheme,
             home: LoopsCatalogScreen(
               onLoopTap: (l) => tappedLoop = l,
             ),
