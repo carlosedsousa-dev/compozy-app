@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'compozy_palette.dart';
@@ -129,6 +130,12 @@ class CompozyTheme {
         foregroundColor: CompozyColors.fgStrong,
         elevation: 0,
         centerTitle: false,
+        systemOverlayStyle: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+          statusBarBrightness: Brightness.dark,
+          systemStatusBarContrastEnforced: false,
+        ),
         titleTextStyle: TextStyle(
           color: CompozyColors.fgStrong,
           fontSize: 15,
@@ -230,6 +237,12 @@ class CompozyTheme {
         foregroundColor: CompozyColorsLight.fgStrong,
         elevation: 0,
         centerTitle: false,
+        systemOverlayStyle: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.dark,
+          statusBarBrightness: Brightness.light,
+          systemStatusBarContrastEnforced: false,
+        ),
         titleTextStyle: TextStyle(
           color: CompozyColorsLight.fgStrong,
           fontSize: 15,
