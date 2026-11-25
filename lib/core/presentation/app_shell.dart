@@ -136,26 +136,31 @@ class _AppNavigationShellState extends State<AppNavigationShell> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           // CompozyOS Brand Glyph (mirrors lockup-dark.png / lockup-light.png)
-                          Container(
-                            width: 20,
-                            height: 20,
-                            decoration: const BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: SweepGradient(
-                                colors: [
-                                  Color(0xFF0070F3),
-                                  Color(0xFF00DFD8),
-                                  Color(0xFF0070F3),
-                                ],
+                          Image.asset(
+                            'assets/brand/compozy_mark.png',
+                            width: 22,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) => Container(
+                              width: 22,
+                              height: 16,
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: SweepGradient(
+                                  colors: [
+                                    Color(0xFF0070F3),
+                                    Color(0xFF00DFD8),
+                                    Color(0xFF0070F3),
+                                  ],
+                                ),
                               ),
-                            ),
-                            child: Center(
-                              child: Container(
-                                width: 9,
-                                height: 9,
-                                decoration: BoxDecoration(
-                                  color: palette.canvas,
-                                  shape: BoxShape.circle,
+                              child: Center(
+                                child: Container(
+                                  width: 9,
+                                  height: 9,
+                                  decoration: BoxDecoration(
+                                    color: palette.canvas,
+                                    shape: BoxShape.circle,
+                                  ),
                                 ),
                               ),
                             ),
