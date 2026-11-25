@@ -1,6 +1,9 @@
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../../core/network/compozy_api_client.dart';
 import '../../../core/network/health_checker.dart';
 import '../../../core/presentation/compozy_feedback.dart';
 import '../../../core/settings/settings.dart';
@@ -13,7 +16,9 @@ import '../../connection/presentation/connection_banner.dart';
 /// including Base URL, API Token, and active workspace, along with
 /// live connection testing, validation, and feedback.
 class SettingsScreen extends ConsumerStatefulWidget {
-  const SettingsScreen({super.key});
+  final bool? isAndroid;
+
+  const SettingsScreen({super.key, this.isAndroid});
 
   @override
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
@@ -32,6 +37,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String? _testFeedbackMessage;
   bool _initialized = false;
 
+  bool get _isAndroid => widget.isAndroid ?? (!kIsWeb && Platform.isAndroid);
+
   static const _loopbackHosts = {
     'localhost',
     '127.0.0.1',
@@ -40,19 +47,41 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     '[::1]',
   };
 
+  bool _isLoopbackHost(String url) {
+    final trimmed = url.trim();
+    if (trimmed.isEmpty) return false;
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null || !uri.hasAuthority) return false;
+    final host = uri.host.toLowerCase();
+    final cleanHost = (host.startsWith('[') && host.endsWith(']'))
+        ? host.substring(1, host.length - 1)
+        : host;
+    return cleanHost == 'localhost' ||
+        cleanHost == '127.0.0.1' ||
+        cleanHost == '::1';
+  }
+
   @override
   void initState() {
     super.initState();
     final settings = ref.read(settingsProvider);
     _baseUrlController = TextEditingController(text: settings.baseUrl);
+    _baseUrlController.addListener(_onBaseUrlChanged);
     _apiTokenController = TextEditingController(text: settings.apiToken ?? '');
     _workspaceController =
         TextEditingController(text: settings.activeWorkspaceId ?? '');
     _initialized = true;
   }
 
+  void _onBaseUrlChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
   @override
   void dispose() {
+    _baseUrlController.removeListener(_onBaseUrlChanged);
     _baseUrlController.disposeNullable();
     _apiTokenController.disposeNullable();
     _workspaceController.disposeNullable();
@@ -82,10 +111,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       final healthChecker = ref.read(healthCheckerProvider);
       final enteredUrl = _baseUrlController.text.trim();
+      final normalizedEntered =
+          normalizeCompozyBaseUrl(enteredUrl, isAndroid: _isAndroid);
 
       final bool isHealthy;
-      if (enteredUrl.isNotEmpty && enteredUrl != healthChecker.baseUrl) {
-        final customChecker = HealthChecker(baseUrl: enteredUrl);
+      if (enteredUrl.isNotEmpty &&
+          enteredUrl != healthChecker.baseUrl &&
+          normalizedEntered != healthChecker.baseUrl) {
+        final customChecker = HealthChecker(
+          baseUrl: enteredUrl,
+          isAndroid: _isAndroid,
+        );
         isHealthy = await customChecker.checkHealth();
       } else {
         isHealthy = await healthChecker.checkHealth();
@@ -200,8 +236,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (confirmed != true) return;
     }
 
+    final defaultUrl = defaultCompozyBaseUrl(isAndroid: _isAndroid);
     final updated = currentSettings.copyWith(
-      baseUrl: rawBaseUrl.isNotEmpty ? rawBaseUrl : 'http://localhost:2123',
+      baseUrl: rawBaseUrl.isNotEmpty ? rawBaseUrl : defaultUrl,
       apiToken: rawToken,
       clearApiToken: rawToken.isEmpty,
       activeWorkspaceId: rawWorkspace,
@@ -278,12 +315,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     if (confirmed != true) return;
 
-    _baseUrlController.text = 'http://localhost:2123';
+    final defaultUrl = defaultCompozyBaseUrl(isAndroid: _isAndroid);
+    _baseUrlController.text = defaultUrl;
     _apiTokenController.text = '';
     _workspaceController.text = '';
 
     final notifier = ref.read(settingsProvider.notifier);
-    await notifier.updateSettings(const Settings());
+    await notifier.updateSettings(Settings(baseUrl: defaultUrl));
 
     ref.invalidate(healthCheckerProvider);
     ref.invalidate(connectionStatusProvider);
@@ -574,6 +612,85 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               return null;
             },
           ),
+          if (_isAndroid && _isLoopbackHost(_baseUrlController.text)) ...[
+            Builder(
+              builder: (context) {
+                final typedUrl = _baseUrlController.text.trim();
+                final effectiveUrl =
+                    normalizeCompozyBaseUrl(typedUrl, isAndroid: true);
+
+                return Container(
+                  key: const Key('settings_loopback_helper'),
+                  margin: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: palette.surface2,
+                    borderRadius: CompozyRadius.input,
+                    border: Border.all(
+                      color: palette.lineStrong,
+                      width: 1,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.info_outline,
+                              size: 15, color: palette.warning),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'On Android, localhost means the phone itself. Use 10.0.2.2 for the emulator or your machine\'s LAN IP for a physical device.',
+                              style: TextStyle(
+                                color: palette.muted,
+                                fontSize: 12,
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (effectiveUrl != typedUrl) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: palette.elevated,
+                            borderRadius: CompozyRadius.input,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Effective URL: ',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: palette.muted,
+                                ),
+                              ),
+                              Text(
+                                effectiveUrl,
+                                key: const Key('settings_effective_url_text'),
+                                style: TextStyle(
+                                  color: palette.fgStrong,
+                                  fontFamily: 'monospace',
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
           const SizedBox(height: 6),
           Text(
             'Default is http://localhost:2123 (use 10.0.2.2 for Android emulator).',

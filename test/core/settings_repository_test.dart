@@ -145,5 +145,36 @@ void main() {
       expect(loaded.activeWorkspaceId, equals('ws-notifier'));
       expect(loaded.themeMode, equals(ThemeMode.light));
     });
+
+    test('empty prefs on Android yields 10.0.2.2', () async {
+      final prefs = await SharedPreferences.getInstance();
+      final repository = SettingsRepository(preferences: prefs, isAndroid: true);
+
+      final settings = await repository.loadSettings();
+      expect(settings.baseUrl, equals('http://10.0.2.2:2123'));
+    });
+
+    test('persisted legacy localhost literal is migrated on Android', () async {
+      SharedPreferences.setMockInitialValues({
+        'compozy_base_url': 'http://localhost:2123',
+      });
+      final prefs = await SharedPreferences.getInstance();
+      final repository = SettingsRepository(preferences: prefs, isAndroid: true);
+
+      final settings = await repository.loadSettings();
+      expect(settings.baseUrl, equals('http://10.0.2.2:2123'));
+      expect(prefs.getString('compozy_base_url'), equals('http://10.0.2.2:2123'));
+    });
+
+    test('persisted custom URL is preserved on Android', () async {
+      SharedPreferences.setMockInitialValues({
+        'compozy_base_url': 'http://192.168.1.88:2123',
+      });
+      final prefs = await SharedPreferences.getInstance();
+      final repository = SettingsRepository(preferences: prefs, isAndroid: true);
+
+      final settings = await repository.loadSettings();
+      expect(settings.baseUrl, equals('http://192.168.1.88:2123'));
+    });
   });
 }

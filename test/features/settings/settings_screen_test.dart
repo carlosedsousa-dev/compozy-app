@@ -400,5 +400,110 @@ void main() {
       expect(find.text('http://localhost:2123'), findsOneWidget);
       expect(find.text('Settings reset to defaults'), findsOneWidget);
     });
+
+    testWidgets('shows loopback helper on Android with effective URL, and disappears on non-loopback', (tester) async {
+      final repo = _InMemorySettingsRepository(
+        const Settings(baseUrl: 'http://localhost:2123'),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            settingsRepositoryProvider.overrideWithValue(repo),
+            settingsProvider.overrideWith((ref) => SettingsNotifier(repo)),
+            connectionStatusProvider.overrideWith((ref) => Future.value(true)),
+          ],
+          child: MaterialApp(
+            theme: CompozyTheme.darkTheme,
+            home: const SettingsScreen(isAndroid: true),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Loopback helper is visible on Android with localhost
+      expect(find.byKey(const Key('settings_loopback_helper')), findsOneWidget);
+      expect(
+        find.textContaining('localhost means the phone itself'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('settings_effective_url_text')), findsOneWidget);
+      expect(find.text('http://10.0.2.2:2123'), findsOneWidget);
+
+      // Enter non-loopback custom IP
+      final baseUrlField = find.byKey(const Key('settings_base_url_field'));
+      await tester.enterText(baseUrlField, 'http://192.168.1.120:2123');
+      await tester.pumpAndSettle();
+
+      // Loopback helper should disappear
+      expect(find.byKey(const Key('settings_loopback_helper')), findsNothing);
+
+      // Enter emulator gateway 10.0.2.2 (which is already the phone-to-host gateway, not loopback)
+      await tester.enterText(baseUrlField, 'http://10.0.2.2:2123');
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('settings_loopback_helper')), findsNothing);
+
+      // Enter 127.0.0.1 (loopback) again
+      await tester.enterText(baseUrlField, 'http://127.0.0.1:8080');
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('settings_loopback_helper')), findsOneWidget);
+      expect(find.text('http://10.0.2.2:8080'), findsOneWidget);
+    });
+
+    testWidgets('does not show loopback helper when not running on Android', (tester) async {
+      final repo = _InMemorySettingsRepository(
+        const Settings(baseUrl: 'http://localhost:2123'),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            settingsRepositoryProvider.overrideWithValue(repo),
+            settingsProvider.overrideWith((ref) => SettingsNotifier(repo)),
+            connectionStatusProvider.overrideWith((ref) => Future.value(true)),
+          ],
+          child: MaterialApp(
+            theme: CompozyTheme.darkTheme,
+            home: const SettingsScreen(isAndroid: false),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('settings_loopback_helper')), findsNothing);
+    });
+
+    testWidgets('test connection works on Android with custom checker', (tester) async {
+      final repo = _InMemorySettingsRepository(
+        const Settings(baseUrl: 'http://localhost:2123'),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            settingsRepositoryProvider.overrideWithValue(repo),
+            settingsProvider.overrideWith((ref) => SettingsNotifier(repo)),
+            healthCheckerProvider.overrideWithValue(_FakeHealthChecker(healthy: true)),
+            connectionStatusProvider.overrideWith((ref) => Future.value(true)),
+          ],
+          child: MaterialApp(
+            theme: CompozyTheme.darkTheme,
+            home: const SettingsScreen(isAndroid: true),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('settings_test_connection_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('connection_test_success_banner')), findsOneWidget);
+      expect(find.text('Daemon is reachable (HTTP 200 OK)'), findsWidgets);
+    });
   });
 }

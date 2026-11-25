@@ -9,11 +9,44 @@ import 'api_exceptions.dart';
 
 /// Returns the default base URL for CompozyOS daemon.
 /// Uses 10.0.2.2 when running on Android emulator/device to reach host loopback.
-String defaultCompozyBaseUrl() {
-  if (!kIsWeb && Platform.isAndroid) {
+String defaultCompozyBaseUrl({bool? isAndroid}) {
+  final android = isAndroid ?? (!kIsWeb && Platform.isAndroid);
+  if (android) {
     return 'http://10.0.2.2:2123';
   }
   return 'http://localhost:2123';
+}
+
+/// Resolves a user-supplied base URL into one usable from this platform.
+/// - null/blank -> the platform default
+/// - on Android, a loopback host (localhost, 127.0.0.1, [::1]) -> 10.0.2.2, keeping port and path
+/// - every other value is preserved verbatim (aside from trim + trailing-slash removal)
+String normalizeCompozyBaseUrl(String? raw, {bool? isAndroid}) {
+  final android = isAndroid ?? (!kIsWeb && Platform.isAndroid);
+  if (raw == null || raw.trim().isEmpty) {
+    return defaultCompozyBaseUrl(isAndroid: android);
+  }
+
+  var trimmed = raw.trim();
+  trimmed = trimmed.replaceAll(RegExp(r'/+$'), '');
+
+  if (android) {
+    final uri = Uri.tryParse(trimmed);
+    if (uri != null && uri.hasAuthority) {
+      final rawHost = uri.host.toLowerCase();
+      final cleanHost = (rawHost.startsWith('[') && rawHost.endsWith(']'))
+          ? rawHost.substring(1, rawHost.length - 1)
+          : rawHost;
+      if (cleanHost == 'localhost' ||
+          cleanHost == '127.0.0.1' ||
+          cleanHost == '::1') {
+        final replaced = uri.replace(host: '10.0.2.2').toString();
+        return replaced.replaceAll(RegExp(r'/+$'), '');
+      }
+    }
+  }
+
+  return trimmed;
 }
 
 /// Riverpod provider for [CompozyApiClient].
@@ -40,11 +73,13 @@ abstract class CompozyApiClient {
     String? baseUrl,
     String? appToken,
     Settings? settings,
+    bool? isAndroid,
   }) {
     return CompozyApiClientImpl(
       dio: dio,
-      baseUrl: baseUrl ?? settings?.baseUrl ?? defaultCompozyBaseUrl(),
+      baseUrl: baseUrl ?? settings?.baseUrl,
       appToken: appToken ?? settings?.apiToken,
+      isAndroid: isAndroid,
     );
   }
 
@@ -103,12 +138,13 @@ class CompozyApiClientImpl implements CompozyApiClient {
     Dio? dio,
     String? baseUrl,
     String? appToken,
-  })  : _baseUrl = baseUrl ?? defaultCompozyBaseUrl(),
+    bool? isAndroid,
+  })  : _baseUrl = normalizeCompozyBaseUrl(baseUrl, isAndroid: isAndroid),
         _appToken = appToken,
         _dio = dio ??
             Dio(
               BaseOptions(
-                baseUrl: baseUrl ?? defaultCompozyBaseUrl(),
+                baseUrl: normalizeCompozyBaseUrl(baseUrl, isAndroid: isAndroid),
                 connectTimeout: const Duration(seconds: 5),
                 receiveTimeout: const Duration(seconds: 10),
                 headers: {
@@ -121,6 +157,10 @@ class CompozyApiClientImpl implements CompozyApiClient {
     if (dio != null) {
       if (_dio.options.baseUrl.isEmpty) {
         _dio.options.baseUrl = _baseUrl;
+      } else {
+        _dio.options.baseUrl =
+            normalizeCompozyBaseUrl(_dio.options.baseUrl, isAndroid: isAndroid);
+        _baseUrl = _dio.options.baseUrl;
       }
       _dio.options.connectTimeout ??= const Duration(seconds: 5);
       _dio.options.receiveTimeout ??= const Duration(seconds: 10);
@@ -133,8 +173,9 @@ class CompozyApiClientImpl implements CompozyApiClient {
 
   @override
   void updateBaseUrl(String newBaseUrl) {
-    _baseUrl = newBaseUrl;
-    _dio.options.baseUrl = newBaseUrl;
+    final normalized = normalizeCompozyBaseUrl(newBaseUrl);
+    _baseUrl = normalized;
+    _dio.options.baseUrl = normalized;
   }
 
   @override
@@ -160,7 +201,7 @@ class CompozyApiClientImpl implements CompozyApiClient {
   @override
   void updateSettings(Settings settings) {
     updateConfiguration(
-      baseUrl: settings.baseUrl,
+      baseUrl: normalizeCompozyBaseUrl(settings.baseUrl),
       appToken: settings.apiToken,
     );
   }

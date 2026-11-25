@@ -253,6 +253,7 @@ class SseClient {
   final CompozyApiClient? apiClient;
   final String? _explicitBaseUrl;
   final String? _explicitAppToken;
+  final bool? isAndroid;
   final Future<Stream<String>> Function(String url, Map<String, String> headers)?
       streamProvider;
 
@@ -265,6 +266,7 @@ class SseClient {
     String? baseUrl,
     String? appToken,
     this.streamProvider,
+    this.isAndroid,
   })  : dioInstance = dio,
         _explicitBaseUrl = baseUrl,
         _explicitAppToken = appToken;
@@ -273,17 +275,17 @@ class SseClient {
   String get baseUrl {
     final explicit = _explicitBaseUrl;
     if (explicit != null && explicit.isNotEmpty) {
-      return explicit;
+      return normalizeCompozyBaseUrl(explicit, isAndroid: isAndroid);
     }
     final api = apiClient;
     if (api != null) {
-      return api.baseUrl;
+      return normalizeCompozyBaseUrl(api.baseUrl, isAndroid: isAndroid);
     }
     final d = dioInstance;
     if (d != null && d.options.baseUrl.isNotEmpty) {
-      return d.options.baseUrl;
+      return normalizeCompozyBaseUrl(d.options.baseUrl, isAndroid: isAndroid);
     }
-    return defaultCompozyBaseUrl();
+    return defaultCompozyBaseUrl(isAndroid: isAndroid);
   }
 
   /// The active application/API token.

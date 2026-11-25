@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:compozy_app/core/network/api_exceptions.dart';
 import 'package:compozy_app/core/network/compozy_api_client.dart';
 import 'package:compozy_app/core/network/health_checker.dart';
+import 'package:compozy_app/core/settings/settings.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -250,6 +251,92 @@ void main() {
       expect(client, isNotNull);
       expect(client.baseUrl, equals('http://localhost:2123'));
       container.dispose();
+    });
+  });
+
+  group('normalizeCompozyBaseUrl & defaultCompozyBaseUrl', () {
+    test('defaultCompozyBaseUrl respects isAndroid injection seam', () {
+      expect(defaultCompozyBaseUrl(isAndroid: true), equals('http://10.0.2.2:2123'));
+      expect(defaultCompozyBaseUrl(isAndroid: false), equals('http://localhost:2123'));
+    });
+
+    test('blank yields platform default', () {
+      expect(normalizeCompozyBaseUrl(null, isAndroid: true), equals('http://10.0.2.2:2123'));
+      expect(normalizeCompozyBaseUrl('', isAndroid: true), equals('http://10.0.2.2:2123'));
+      expect(normalizeCompozyBaseUrl('   ', isAndroid: true), equals('http://10.0.2.2:2123'));
+
+      expect(normalizeCompozyBaseUrl(null, isAndroid: false), equals('http://localhost:2123'));
+      expect(normalizeCompozyBaseUrl('', isAndroid: false), equals('http://localhost:2123'));
+      expect(normalizeCompozyBaseUrl('   ', isAndroid: false), equals('http://localhost:2123'));
+    });
+
+    test('http://localhost:2123 + isAndroid -> http://10.0.2.2:2123', () {
+      expect(
+        normalizeCompozyBaseUrl('http://localhost:2123', isAndroid: true),
+        equals('http://10.0.2.2:2123'),
+      );
+    });
+
+    test('http://127.0.0.1:9999/api + isAndroid keeps port and path', () {
+      expect(
+        normalizeCompozyBaseUrl('http://127.0.0.1:9999/api', isAndroid: true),
+        equals('http://10.0.2.2:9999/api'),
+      );
+    });
+
+    test('IPv6 loopback + isAndroid -> http://10.0.2.2:2123/api', () {
+      expect(
+        normalizeCompozyBaseUrl('http://[::1]:2123/api', isAndroid: true),
+        equals('http://10.0.2.2:2123/api'),
+      );
+    });
+
+    test('http://192.168.0.10:2123 untouched', () {
+      expect(
+        normalizeCompozyBaseUrl('http://192.168.0.10:2123', isAndroid: true),
+        equals('http://192.168.0.10:2123'),
+      );
+      expect(
+        normalizeCompozyBaseUrl('http://192.168.0.10:2123', isAndroid: false),
+        equals('http://192.168.0.10:2123'),
+      );
+    });
+
+    test('http://localhost:2123 with isAndroid: false untouched', () {
+      expect(
+        normalizeCompozyBaseUrl('http://localhost:2123', isAndroid: false),
+        equals('http://localhost:2123'),
+      );
+    });
+
+    test('trailing slash trimmed', () {
+      expect(
+        normalizeCompozyBaseUrl('http://localhost:2123/', isAndroid: true),
+        equals('http://10.0.2.2:2123'),
+      );
+      expect(
+        normalizeCompozyBaseUrl('http://192.168.0.10:2123/', isAndroid: true),
+        equals('http://192.168.0.10:2123'),
+      );
+      expect(
+        normalizeCompozyBaseUrl('http://127.0.0.1:9999/api/', isAndroid: true),
+        equals('http://10.0.2.2:9999/api'),
+      );
+      expect(
+        normalizeCompozyBaseUrl('http://localhost:2123///', isAndroid: false),
+        equals('http://localhost:2123'),
+      );
+    });
+
+    test('CompozyApiClient normalizes baseUrl on construction and updateSettings', () {
+      final client = CompozyApiClient(
+        baseUrl: 'http://localhost:2123',
+        isAndroid: true,
+      );
+      expect(client.baseUrl, equals('http://10.0.2.2:2123'));
+
+      client.updateSettings(const Settings(baseUrl: 'http://192.168.1.1:2123/'));
+      expect(client.baseUrl, equals('http://192.168.1.1:2123'));
     });
   });
 }

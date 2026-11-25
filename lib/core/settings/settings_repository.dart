@@ -1,7 +1,10 @@
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../network/compozy_api_client.dart';
 import 'settings.dart';
 
 /// Provider for the [SharedPreferences] instance.
@@ -22,7 +25,10 @@ class SettingsNotifier extends StateNotifier<Settings> {
   SettingsNotifier(
     this._repository, [
     Settings? initialSettings,
-  ]) : super(_repository.cachedSettings ?? initialSettings ?? const Settings()) {
+    bool? isAndroid,
+  ]) : super(_repository.cachedSettings ??
+            initialSettings ??
+            Settings(baseUrl: defaultCompozyBaseUrl(isAndroid: isAndroid))) {
     if (_repository.cachedSettings == null) {
       _init();
     }
@@ -102,6 +108,7 @@ abstract class SettingsRepository {
   factory SettingsRepository({
     SharedPreferences? preferences,
     SharedPreferences? prefs,
+    bool? isAndroid,
   }) = SettingsRepositoryImpl;
 
   /// Loads persisted settings from storage or returns defaults.
@@ -124,10 +131,12 @@ abstract class SettingsRepository {
 class SettingsRepositoryImpl implements SettingsRepository {
   SharedPreferences? _preferences;
   Settings? _cachedSettings;
+  final bool? isAndroid;
 
   SettingsRepositoryImpl({
     SharedPreferences? preferences,
     SharedPreferences? prefs,
+    this.isAndroid,
   }) : _preferences = preferences ?? prefs {
     if (_preferences != null) {
       _cachedSettings = _readFromPrefs(_preferences!);
@@ -147,10 +156,21 @@ class SettingsRepositoryImpl implements SettingsRepository {
   static const String _keyThemeMode = 'compozy_theme_mode';
 
   Settings _readFromPrefs(SharedPreferences prefs) {
-    final baseUrl = prefs.getString(_keyBaseUrl) ??
+    final rawBaseUrl = prefs.getString(_keyBaseUrl) ??
         prefs.getString('baseUrl') ??
-        prefs.getString('base_url') ??
-        'http://localhost:2123';
+        prefs.getString('base_url');
+
+    final android = isAndroid ?? (!kIsWeb && Platform.isAndroid);
+    final String baseUrl;
+    if (rawBaseUrl == null || rawBaseUrl.trim().isEmpty) {
+      baseUrl = defaultCompozyBaseUrl(isAndroid: android);
+    } else if (android &&
+        (rawBaseUrl.trim() == 'http://localhost:2123' ||
+            rawBaseUrl.trim() == 'http://localhost:2123/')) {
+      baseUrl = defaultCompozyBaseUrl(isAndroid: true);
+    } else {
+      baseUrl = rawBaseUrl;
+    }
 
     final apiToken = prefs.getString(_keyApiToken) ??
         prefs.getString('apiToken') ??
@@ -191,9 +211,24 @@ class SettingsRepositoryImpl implements SettingsRepository {
       final prefs = await _getPrefs();
       final loaded = _readFromPrefs(prefs);
       _cachedSettings = loaded;
+
+      final rawBaseUrl = prefs.getString(_keyBaseUrl) ??
+          prefs.getString('baseUrl') ??
+          prefs.getString('base_url');
+      final android = isAndroid ?? (!kIsWeb && Platform.isAndroid);
+      if (android &&
+          rawBaseUrl != null &&
+          (rawBaseUrl.trim() == 'http://localhost:2123' ||
+              rawBaseUrl.trim() == 'http://localhost:2123/')) {
+        await prefs.setString(_keyBaseUrl, loaded.baseUrl);
+        await prefs.setString('baseUrl', loaded.baseUrl);
+        await prefs.setString('base_url', loaded.baseUrl);
+      }
+
       return loaded;
     } catch (_) {
-      return _cachedSettings ?? const Settings();
+      return _cachedSettings ??
+          Settings(baseUrl: defaultCompozyBaseUrl(isAndroid: isAndroid));
     }
   }
 

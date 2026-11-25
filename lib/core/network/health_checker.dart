@@ -16,6 +16,7 @@ class HealthChecker {
   final CompozyApiClient? apiClient;
   final Dio _dio;
   final String _baseUrl;
+  final bool? isAndroid;
 
   /// The active base URL being checked.
   String get baseUrl => apiClient?.baseUrl ?? _baseUrl;
@@ -24,16 +25,35 @@ class HealthChecker {
     this.apiClient,
     Dio? dio,
     String? baseUrl,
-  })  : _baseUrl = baseUrl ?? (apiClient?.baseUrl ?? defaultCompozyBaseUrl()),
+    this.isAndroid,
+  })  : _baseUrl = normalizeCompozyBaseUrl(
+          baseUrl ??
+              (dio != null && dio.options.baseUrl.isNotEmpty
+                  ? dio.options.baseUrl
+                  : null) ??
+              apiClient?.baseUrl,
+          isAndroid: isAndroid,
+        ),
         _dio = dio ??
             Dio(
               BaseOptions(
-                baseUrl:
-                    baseUrl ?? (apiClient?.baseUrl ?? defaultCompozyBaseUrl()),
+                baseUrl: normalizeCompozyBaseUrl(
+                  baseUrl ?? apiClient?.baseUrl,
+                  isAndroid: isAndroid,
+                ),
                 connectTimeout: const Duration(seconds: 5),
                 receiveTimeout: const Duration(seconds: 10),
               ),
-            );
+            ) {
+    if (dio != null) {
+      if (_dio.options.baseUrl.isEmpty) {
+        _dio.options.baseUrl = _baseUrl;
+      } else {
+        _dio.options.baseUrl =
+            normalizeCompozyBaseUrl(_dio.options.baseUrl, isAndroid: isAndroid);
+      }
+    }
+  }
 
   /// Performs a health check against the CompozyOS daemon OpenAPI endpoint.
   ///
