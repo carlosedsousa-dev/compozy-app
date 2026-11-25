@@ -90,6 +90,14 @@ class SettingsNotifier extends StateNotifier<Settings> {
     state = updated;
     await _repository.saveSettings(updated);
   }
+
+  /// Updates and persists the confirmed connection flag.
+  Future<void> setConfirmedConnection(bool confirmed) async {
+    _userModified = true;
+    final updated = state.copyWith(hasConfirmedConnection: confirmed);
+    state = updated;
+    await _repository.saveSettings(updated);
+  }
 }
 
 /// Riverpod provider for reactive [Settings] access and updates.
@@ -154,6 +162,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
   static const String _keyApiToken = 'compozy_api_token';
   static const String _keyActiveWorkspaceId = 'compozy_active_workspace_id';
   static const String _keyThemeMode = 'compozy_theme_mode';
+  static const String _keyConfirmedConnection = 'compozy_confirmed_connection';
 
   Settings _readFromPrefs(SharedPreferences prefs) {
     final rawBaseUrl = prefs.getString(_keyBaseUrl) ??
@@ -196,12 +205,19 @@ class SettingsRepositoryImpl implements SettingsRepository {
       }
     }
 
+    final hasConfirmedConnection =
+        prefs.getBool(_keyConfirmedConnection) ??
+        prefs.getBool('hasConfirmedConnection') ??
+        prefs.getBool('has_confirmed_connection') ??
+        false;
+
     return Settings(
       baseUrl: baseUrl,
       apiToken: apiToken?.isNotEmpty == true ? apiToken : null,
       activeWorkspaceId:
           activeWorkspaceId?.isNotEmpty == true ? activeWorkspaceId : null,
       themeMode: themeMode,
+      hasConfirmedConnection: hasConfirmedConnection,
     );
   }
 
@@ -269,9 +285,33 @@ class SettingsRepositoryImpl implements SettingsRepository {
     await prefs.setString('themeMode', settings.themeMode.name);
     await prefs.setString('theme_mode', settings.themeMode.name);
 
+    await prefs.setBool(
+        _keyConfirmedConnection, settings.hasConfirmedConnection);
+    await prefs.setBool(
+        'hasConfirmedConnection', settings.hasConfirmedConnection);
+    await prefs.setBool(
+        'has_confirmed_connection', settings.hasConfirmedConnection);
+
     _cachedSettings = settings;
   }
 
   @override
   Future<void> updateSettings(Settings settings) => saveSettings(settings);
+
+  /// Sets whether the daemon connection has been confirmed.
+  Future<void> setConfirmedConnection(bool confirmed) async {
+    final current = _cachedSettings ?? await loadSettings();
+    final updated = current.copyWith(hasConfirmedConnection: confirmed);
+    await saveSettings(updated);
+  }
+}
+
+/// Extension providing [setConfirmedConnection] for any [SettingsRepository].
+extension SettingsRepositoryConfirmationExtension on SettingsRepository {
+  /// Persists whether the daemon connection has been confirmed.
+  Future<void> setConfirmedConnection(bool confirmed) async {
+    final current = cachedSettings ?? await loadSettings();
+    final updated = current.copyWith(hasConfirmedConnection: confirmed);
+    await saveSettings(updated);
+  }
 }

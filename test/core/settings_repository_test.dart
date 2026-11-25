@@ -176,5 +176,50 @@ void main() {
       final settings = await repository.loadSettings();
       expect(settings.baseUrl, equals('http://192.168.1.88:2123'));
     });
+
+    test('hasConfirmedConnection defaults to false and round-trips via setConfirmedConnection', () async {
+      final prefs = await SharedPreferences.getInstance();
+      final repository = SettingsRepository(preferences: prefs);
+
+      // Default is false
+      final initial = await repository.loadSettings();
+      expect(initial.hasConfirmedConnection, isFalse);
+
+      // Set confirmed connection via repository method
+      await repository.setConfirmedConnection(true);
+
+      // Reload from storage
+      final updated = await repository.loadSettings();
+      expect(updated.hasConfirmedConnection, isTrue);
+
+      // Verify persistence across new repository instance
+      final restartedRepo = SettingsRepository(preferences: prefs);
+      final persisted = await restartedRepo.loadSettings();
+      expect(persisted.hasConfirmedConnection, isTrue);
+
+      // Set back to false
+      await repository.setConfirmedConnection(false);
+      final reset = await restartedRepo.loadSettings();
+      expect(reset.hasConfirmedConnection, isFalse);
+    });
+
+    test('Settings domain model hasConfirmedConnection default and serialization', () {
+      // Default constructor value is false
+      const defaultSettings = Settings();
+      expect(defaultSettings.hasConfirmedConnection, isFalse);
+
+      // Serialization round-trip with true
+      const confirmedSettings = Settings(hasConfirmedConnection: true);
+      final map = confirmedSettings.toMap();
+      expect(map['hasConfirmedConnection'], isTrue);
+
+      final fromMap = Settings.fromMap(map);
+      expect(fromMap.hasConfirmedConnection, isTrue);
+
+      // Absent key in JSON/map defaults to false
+      final absentMap = <String, dynamic>{'baseUrl': 'http://custom:2123'};
+      final fromAbsent = Settings.fromMap(absentMap);
+      expect(fromAbsent.hasConfirmedConnection, isFalse);
+    });
   });
 }

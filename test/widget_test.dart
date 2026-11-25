@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'package:compozy_app/core/settings/settings.dart';
+import 'package:compozy_app/core/settings/settings_repository.dart';
 import 'package:compozy_app/features/agents/data/agents_repository_provider.dart';
 import 'package:compozy_app/features/automations/data/automation_repository_impl.dart';
 import 'package:compozy_app/features/connection/presentation/connection_banner.dart';
@@ -9,7 +11,36 @@ import 'package:compozy_app/features/loops/data/loop_repository_impl.dart';
 import 'package:compozy_app/features/sessions/data/session_repository_impl.dart';
 import 'package:compozy_app/main.dart';
 
+class _InMemorySettingsRepo implements SettingsRepository {
+  Settings _settings;
+
+  _InMemorySettingsRepo([Settings? initial])
+      : _settings = initial ?? const Settings(hasConfirmedConnection: true);
+
+  @override
+  Settings? get cachedSettings => _settings;
+
+  @override
+  Future<Settings> loadSettings() async => _settings;
+
+  @override
+  Future<Settings> getSettings() async => _settings;
+
+  @override
+  Future<void> saveSettings(Settings settings) async {
+    _settings = settings;
+  }
+
+  @override
+  Future<void> updateSettings(Settings settings) async {
+    _settings = settings;
+  }
+}
+
 List<Override> _createOverrides() {
+  final settingsRepo = _InMemorySettingsRepo(
+    const Settings(hasConfirmedConnection: true),
+  );
   return [
     sessionsProvider.overrideWith((ref) => Future.value(const [])),
     loopsProvider.overrideWith((ref) => Future.value(const [])),
@@ -20,6 +51,8 @@ List<Override> _createOverrides() {
       (ref) => Future.value(const SchedulerStatus()),
     ),
     connectionStatusProvider.overrideWith((ref) => Future.value(true)),
+    settingsRepositoryProvider.overrideWithValue(settingsRepo),
+    settingsProvider.overrideWith((ref) => SettingsNotifier(settingsRepo)),
   ];
 }
 

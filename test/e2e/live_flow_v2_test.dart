@@ -339,6 +339,7 @@ void main() {
             apiToken: 'initial-v2-token',
             activeWorkspaceId: 'ws-initial',
             themeMode: ThemeMode.dark,
+            hasConfirmedConnection: true,
           ),
         );
 
@@ -658,7 +659,7 @@ void main() {
         final apiClient = CompozyApiClient(dio: dio);
 
         final settingsRepo = _InMemorySettingsRepo(
-          const Settings(themeMode: ThemeMode.dark),
+          const Settings(themeMode: ThemeMode.dark, hasConfirmedConnection: true),
         );
 
         await tester.pumpWidget(

@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
-import 'core/presentation/app_shell.dart';
 import 'core/settings/settings_repository.dart';
 import 'core/theme/compozy_theme.dart';
+import 'features/connection/presentation/connection_gate.dart';
 
 void main() {
   runApp(const ProviderScope(child: CompozyApp()));
@@ -23,7 +23,7 @@ class CompozyApp extends ConsumerWidget {
       theme: CompozyTheme.lightTheme,
       darkTheme: CompozyTheme.darkTheme,
       themeMode: settings.themeMode,
-      home: const AppNavigationShell(),
+      home: const ConnectionGate(),
     );
   }
 }

@@ -7,8 +7,36 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'package:compozy_app/core/network/compozy_api_client.dart';
+import 'package:compozy_app/core/settings/settings.dart';
+import 'package:compozy_app/core/settings/settings_repository.dart';
 import 'package:compozy_app/core/theme/compozy_theme.dart';
 import 'package:compozy_app/main.dart';
+
+class _InMemorySettingsRepo implements SettingsRepository {
+  Settings _settings;
+
+  _InMemorySettingsRepo([Settings? initial])
+      : _settings = initial ?? const Settings(hasConfirmedConnection: true);
+
+  @override
+  Settings? get cachedSettings => _settings;
+
+  @override
+  Future<Settings> loadSettings() async => _settings;
+
+  @override
+  Future<Settings> getSettings() async => _settings;
+
+  @override
+  Future<void> saveSettings(Settings settings) async {
+    _settings = settings;
+  }
+
+  @override
+  Future<void> updateSettings(Settings settings) async {
+    _settings = settings;
+  }
+}
 
 /// Deterministic mock HTTP adapter simulating CompozyOS REST daemon endpoints.
 class _E2EMockHttpAdapter implements HttpClientAdapter {
@@ -263,10 +291,16 @@ void main() {
         dio.httpClientAdapter = mockAdapter;
         final apiClient = CompozyApiClient(dio: dio);
 
+        final settingsRepo = _InMemorySettingsRepo(
+          const Settings(hasConfirmedConnection: true),
+        );
+
         await tester.pumpWidget(
           ProviderScope(
             overrides: [
               compozyApiClientProvider.overrideWithValue(apiClient),
+              settingsRepositoryProvider.overrideWithValue(settingsRepo),
+              settingsProvider.overrideWith((ref) => SettingsNotifier(settingsRepo)),
             ],
             child: const MyApp(),
           ),
@@ -458,10 +492,16 @@ void main() {
         dio.httpClientAdapter = mockAdapter;
         final apiClient = CompozyApiClient(dio: dio);
 
+        final settingsRepo = _InMemorySettingsRepo(
+          const Settings(hasConfirmedConnection: true),
+        );
+
         await tester.pumpWidget(
           ProviderScope(
             overrides: [
               compozyApiClientProvider.overrideWithValue(apiClient),
+              settingsRepositoryProvider.overrideWithValue(settingsRepo),
+              settingsProvider.overrideWith((ref) => SettingsNotifier(settingsRepo)),
             ],
             child: const MyApp(),
           ),
@@ -529,10 +569,16 @@ void main() {
         dio.httpClientAdapter = mockAdapter;
         final apiClient = CompozyApiClient(dio: dio);
 
+        final settingsRepo = _InMemorySettingsRepo(
+          const Settings(hasConfirmedConnection: true),
+        );
+
         await tester.pumpWidget(
           ProviderScope(
             overrides: [
               compozyApiClientProvider.overrideWithValue(apiClient),
+              settingsRepositoryProvider.overrideWithValue(settingsRepo),
+              settingsProvider.overrideWith((ref) => SettingsNotifier(settingsRepo)),
             ],
             child: const MyApp(),
           ),

@@ -187,7 +187,9 @@ void main() {
     });
 
     testWidgets('CompozyApp reactively switches ThemeData when themeMode changes', (tester) async {
-      final repo = _InMemorySettingsRepo(const Settings(themeMode: ThemeMode.dark));
+      final repo = _InMemorySettingsRepo(
+        const Settings(themeMode: ThemeMode.dark, hasConfirmedConnection: true),
+      );
 
       await tester.pumpWidget(
         ProviderScope(
