@@ -21,7 +21,7 @@ class CompozyColors {
   static const Color elevated = Color(0xFF232323);   // Elevated pills, hover, chat user bubble (#232323)
 
   // Lines & Borders (1px solid canonical line)
-  static const Color line = Color(0xFF262626);       // Canonical border (#262626, 1px sólido)
+  static const Color line = Color(0xFF262626);       // Canonical border (#262626, 1px solid)
   static const Color lineSoft = Color(0xFF1F1F1F);   // Subtle divider
   static const Color lineStrong = Color(0xFF383838); // Highlighted / selected border
 

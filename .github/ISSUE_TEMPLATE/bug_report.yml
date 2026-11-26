@@ -1,0 +1,68 @@
+name: Bug Report
+description: Report a defect in the CompozyOS Flutter client (beta)
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > **Beta software:** `compozy-app` is an early beta client for a local CompozyOS daemon. Please search existing issues before filing a duplicate.
+  - type: input
+    id: app_version
+    attributes:
+      label: App version
+      description: Version from pubspec.yaml or commit SHA (e.g. 0.1.0+1 / main@abc1234)
+      placeholder: "0.1.0+1"
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Android (Emulator)
+        - Android (Physical Device)
+        - Linux Desktop
+        - macOS Desktop
+        - Windows Desktop
+        - Web
+    validations:
+      required: true
+  - type: input
+    id: daemon_version
+    attributes:
+      label: CompozyOS daemon version
+      description: Output or version reported by `/api/openapi.json` (if applicable)
+      placeholder: "e.g. 0.x.y or unknown"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Exact steps needed to reproduce the issue.
+      placeholder: |
+        1. Launch the app and connect to...
+        2. Navigate to...
+        3. Tap...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What happened instead (please redact any tokens or private workspace data).
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Screenshots (optional)
+      description: Any relevant Flutter console output or screenshots (demo/sanitized data only).

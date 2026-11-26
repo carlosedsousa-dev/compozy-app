@@ -82,18 +82,18 @@ class _DaemonSetupScreenState extends ConsumerState<DaemonSetupScreen> {
 
   String? _validateUrl(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return 'Informe o endereço do daemon';
+      return 'Enter the daemon address';
     }
     final trimmed = value.trim();
     final uri = Uri.tryParse(trimmed);
     if (uri == null || !uri.hasScheme || !uri.hasAuthority) {
-      return 'URL inválida. Formato esperado: http://host:porta';
+      return 'Invalid URL. Expected format: http://host:port';
     }
     if (uri.scheme != 'http' && uri.scheme != 'https') {
-      return 'O esquema deve ser http ou https';
+      return 'Scheme must be http or https';
     }
     if (uri.host.isEmpty) {
-      return 'Host não pode ser vazio';
+      return 'Host cannot be empty';
     }
     return null;
   }
@@ -130,7 +130,7 @@ class _DaemonSetupScreenState extends ConsumerState<DaemonSetupScreen> {
           return;
         } else {
           throw CompozyNetworkException(
-            message: 'Conexão recusada em $normalizedUrl',
+            message: 'Connection refused at $normalizedUrl',
           );
         }
       }
@@ -169,7 +169,7 @@ class _DaemonSetupScreenState extends ConsumerState<DaemonSetupScreen> {
           setState(() {
             _isTesting = false;
             _errorMessage =
-                'Resposta inesperada do daemon (HTTP ${response.statusCode})';
+                'Unexpected response from daemon (HTTP ${response.statusCode})';
           });
         }
       }
@@ -179,15 +179,15 @@ class _DaemonSetupScreenState extends ConsumerState<DaemonSetupScreen> {
       if (e.type == DioExceptionType.connectionTimeout ||
           e.type == DioExceptionType.sendTimeout ||
           e.type == DioExceptionType.receiveTimeout) {
-        message = 'Tempo limite esgotado ao conectar ao daemon ($normalizedUrl)';
+        message = 'Timed out connecting to daemon ($normalizedUrl)';
       } else if (e.type == DioExceptionType.connectionError) {
         message =
-            'Conexão recusada em $normalizedUrl. Verifique se o daemon está em execução.';
+            'Connection refused at $normalizedUrl. Check that the daemon is running.';
       } else if (e.response?.statusCode == 404) {
         message =
-            'Endpoint /api/openapi.json não encontrado (HTTP 404). Verifique o host e a porta.';
+            'Endpoint /api/openapi.json not found (HTTP 404). Check the host and port.';
       } else {
-        message = e.message ?? 'Falha de rede ao conectar ao daemon';
+        message = e.message ?? 'Network error while connecting to the daemon';
       }
       setState(() {
         _isTesting = false;
@@ -197,7 +197,7 @@ class _DaemonSetupScreenState extends ConsumerState<DaemonSetupScreen> {
       if (!mounted) return;
       setState(() {
         _isTesting = false;
-        _errorMessage = 'Falha ao testar conexão: $e';
+        _errorMessage = 'Failed to test connection: $e';
       });
     }
   }
@@ -276,7 +276,7 @@ class _DaemonSetupScreenState extends ConsumerState<DaemonSetupScreen> {
 
                     // Title
                     Text(
-                      'Conectar ao daemon',
+                      'Connect to the daemon',
                       style: TextStyle(
                         color: palette.fgStrong,
                         fontSize: textScaler.scale(24),
@@ -288,7 +288,7 @@ class _DaemonSetupScreenState extends ConsumerState<DaemonSetupScreen> {
 
                     // Subtitle / short line
                     Text(
-                      'O aplicativo comunica-se com um daemon CompozyOS local para orquestrar agentes e sessões.',
+                      'The app talks to a local CompozyOS daemon to orchestrate agents and sessions.',
                       style: TextStyle(
                         color: palette.muted,
                         fontSize: textScaler.scale(14),
@@ -299,7 +299,7 @@ class _DaemonSetupScreenState extends ConsumerState<DaemonSetupScreen> {
 
                     // URL Input Label
                     Text(
-                      'Endereço do daemon',
+                      'Daemon address',
                       style: TextStyle(
                         color: palette.fg,
                         fontSize: textScaler.scale(13),
@@ -360,7 +360,7 @@ class _DaemonSetupScreenState extends ConsumerState<DaemonSetupScreen> {
                               return const SizedBox.shrink();
                             }
                             return Semantics(
-                              label: 'Limpar endereço do daemon',
+                              label: 'Clear daemon address',
                               button: true,
                               child: IconButton(
                                 icon: Icon(
@@ -381,7 +381,7 @@ class _DaemonSetupScreenState extends ConsumerState<DaemonSetupScreen> {
 
                     // Candidate Shortcuts Header
                     Text(
-                      'Atalhos de conexão',
+                      'Connection shortcuts',
                       style: TextStyle(
                         color: palette.subtle,
                         fontSize: textScaler.scale(12),
@@ -395,7 +395,7 @@ class _DaemonSetupScreenState extends ConsumerState<DaemonSetupScreen> {
                     _buildCandidateTile(
                       key: const Key('candidate_emulator'),
                       icon: Icons.phone_android_outlined,
-                      label: 'Emulador Android · 10.0.2.2:2123',
+                      label: 'Android emulator · 10.0.2.2:2123',
                       targetUrl: 'http://10.0.2.2:2123',
                       palette: palette,
                       textScaler: textScaler,
@@ -406,7 +406,7 @@ class _DaemonSetupScreenState extends ConsumerState<DaemonSetupScreen> {
                     _buildCandidateTile(
                       key: const Key('candidate_localhost'),
                       icon: Icons.computer_outlined,
-                      label: 'Este computador · localhost:2123',
+                      label: 'This computer · localhost:2123',
                       targetUrl: 'http://localhost:2123',
                       palette: palette,
                       textScaler: textScaler,
@@ -433,7 +433,7 @@ class _DaemonSetupScreenState extends ConsumerState<DaemonSetupScreen> {
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                'No Android, localhost refere-se ao próprio dispositivo. Em emuladores use 10.0.2.2; em aparelhos físicos na rede local, use o IP da sua máquina.',
+                                'On Android, localhost refers to the device itself. Use 10.0.2.2 on emulators; on physical devices on the local network, use your machine\'s IP.',
                                 style: TextStyle(
                                   color: palette.muted,
                                   fontSize: textScaler.scale(12),
@@ -471,7 +471,7 @@ class _DaemonSetupScreenState extends ConsumerState<DaemonSetupScreen> {
                             ),
                             const SizedBox(width: 12),
                             Text(
-                              'Testando conexão...',
+                              'Testing connection...',
                               style: TextStyle(
                                 color: palette.muted,
                                 fontSize: textScaler.scale(13),
@@ -503,7 +503,7 @@ class _DaemonSetupScreenState extends ConsumerState<DaemonSetupScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Conectado',
+                                    'Connected',
                                     style: TextStyle(
                                       color: palette.success,
                                       fontSize: textScaler.scale(14),
@@ -550,7 +550,7 @@ class _DaemonSetupScreenState extends ConsumerState<DaemonSetupScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Falha na conexão',
+                                    'Connection failed',
                                     style: TextStyle(
                                       color: palette.danger,
                                       fontSize: textScaler.scale(13),
@@ -576,7 +576,7 @@ class _DaemonSetupScreenState extends ConsumerState<DaemonSetupScreen> {
 
                     const SizedBox(height: 28),
 
-                    // Primary Button (Continuar when connected, Testar conexão otherwise)
+                    // Primary Button (Continue when connected, Test connection otherwise)
                     if (_isConnected)
                       ElevatedButton(
                         key: const Key('daemon_setup_continue_button'),
@@ -598,7 +598,7 @@ class _DaemonSetupScreenState extends ConsumerState<DaemonSetupScreen> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              'Continuar',
+                              'Continue',
                               style: TextStyle(
                                 fontSize: textScaler.scale(14),
                                 fontWeight: FontWeight.w600,
@@ -634,7 +634,7 @@ class _DaemonSetupScreenState extends ConsumerState<DaemonSetupScreen> {
                               const SizedBox(width: 8),
                             ],
                             Text(
-                              _isTesting ? 'Testando conexão...' : 'Testar conexão',
+                              _isTesting ? 'Testing connection...' : 'Test connection',
                               style: TextStyle(
                                 fontSize: textScaler.scale(14),
                                 fontWeight: FontWeight.w600,
@@ -646,7 +646,7 @@ class _DaemonSetupScreenState extends ConsumerState<DaemonSetupScreen> {
 
                     const SizedBox(height: 12),
 
-                    // Secondary Button: Continuar offline
+                    // Secondary Button: Continue offline
                     TextButton(
                       key: const Key('daemon_setup_offline_button'),
                       onPressed: _handleContinueOffline,
@@ -662,7 +662,7 @@ class _DaemonSetupScreenState extends ConsumerState<DaemonSetupScreen> {
                         ),
                       ),
                       child: Text(
-                        'Continuar offline',
+                        'Continue offline',
                         style: TextStyle(
                           fontSize: textScaler.scale(13),
                           fontWeight: FontWeight.w500,
@@ -691,7 +691,7 @@ class _DaemonSetupScreenState extends ConsumerState<DaemonSetupScreen> {
 
     return Semantics(
       button: true,
-      label: 'Preencher $label',
+      label: 'Fill in $label',
       child: Material(
         color: isSelected ? palette.surface2 : palette.card,
         borderRadius: CompozyRadius.input,

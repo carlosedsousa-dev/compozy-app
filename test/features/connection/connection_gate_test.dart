@@ -68,7 +68,7 @@ void main() {
 
       expect(find.byType(DaemonSetupScreen), findsOneWidget);
       expect(find.byType(AppNavigationShell), findsNothing);
-      expect(find.text('Conectar ao daemon'), findsOneWidget);
+      expect(find.text('Connect to the daemon'), findsOneWidget);
     });
 
     testWidgets('3. Continue offline -> Shell without persisting confirmation', (tester) async {
@@ -98,7 +98,7 @@ void main() {
       expect(find.byType(DaemonSetupScreen), findsOneWidget);
       expect(find.byType(AppNavigationShell), findsNothing);
 
-      // Tap Continuar offline
+      // Tap Continue offline
       final offlineBtnFinder = find.byKey(const Key('daemon_setup_offline_button'));
       await tester.ensureVisible(offlineBtnFinder);
       await tester.tap(offlineBtnFinder);
@@ -151,7 +151,7 @@ void main() {
 
       expect(find.byType(DaemonSetupScreen), findsOneWidget);
 
-      // Tap Testar conexão
+      // Tap Test connection
       final testBtnFinder = find.byKey(const Key('daemon_setup_test_button'));
       await tester.ensureVisible(testBtnFinder);
       await tester.tap(testBtnFinder);
@@ -160,7 +160,7 @@ void main() {
       // Verify connected banner appears
       expect(find.byKey(const Key('daemon_setup_success_banner')), findsOneWidget);
 
-      // Tap Continuar
+      // Tap Continue
       final continueBtnFinder = find.byKey(const Key('daemon_setup_continue_button'));
       await tester.ensureVisible(continueBtnFinder);
       await tester.tap(continueBtnFinder);

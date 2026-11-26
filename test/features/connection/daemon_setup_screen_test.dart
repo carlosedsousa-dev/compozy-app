@@ -87,7 +87,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Tap Testar conexão
+      // Tap Test connection
       final testBtnFinder = find.byKey(const Key('daemon_setup_test_button'));
       await tester.ensureVisible(testBtnFinder);
       await tester.tap(testBtnFinder);
@@ -95,14 +95,14 @@ void main() {
 
       // Verify connected state banner appears
       expect(find.byKey(const Key('daemon_setup_success_banner')), findsOneWidget);
-      expect(find.text('Conectado'), findsOneWidget);
+      expect(find.text('Connected'), findsOneWidget);
       expect(find.text('CompozyOS Daemon · v1.0.0'), findsOneWidget);
 
-      // Verify primary button changed to Continuar
+      // Verify primary button changed to Continue
       final continueBtnFinder = find.byKey(const Key('daemon_setup_continue_button'));
       expect(continueBtnFinder, findsOneWidget);
 
-      // Tap Continuar
+      // Tap Continue
       await tester.ensureVisible(continueBtnFinder);
       await tester.tap(continueBtnFinder);
       await tester.pumpAndSettle();
@@ -142,7 +142,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Tap Testar conexão
+      // Tap Test connection
       final testBtnFinder = find.byKey(const Key('daemon_setup_test_button'));
       await tester.ensureVisible(testBtnFinder);
       await tester.tap(testBtnFinder);
@@ -150,13 +150,13 @@ void main() {
 
       // Error banner should be visible
       expect(find.byKey(const Key('daemon_setup_error_banner')), findsOneWidget);
-      expect(find.text('Falha na conexão'), findsOneWidget);
+      expect(find.text('Connection failed'), findsOneWidget);
 
       // Confirmation is NOT persisted
       final savedSettings = await repository.loadSettings();
       expect(savedSettings.hasConfirmedConnection, isFalse);
 
-      // Primary button is still Testar conexão (allows retry)
+      // Primary button is still Test connection (allows retry)
       expect(find.byKey(const Key('daemon_setup_test_button')), findsOneWidget);
       expect(find.byKey(const Key('daemon_setup_continue_button')), findsNothing);
     });
@@ -190,7 +190,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Tap Continuar offline
+      // Tap Continue offline
       final offlineBtnFinder = find.byKey(const Key('daemon_setup_offline_button'));
       await tester.ensureVisible(offlineBtnFinder);
       await tester.tap(offlineBtnFinder);
@@ -222,7 +222,7 @@ void main() {
       await tester.tap(testBtnFinder);
       await tester.pumpAndSettle();
 
-      expect(find.text('O esquema deve ser http ou https'), findsOneWidget);
+      expect(find.text('Scheme must be http or https'), findsOneWidget);
 
       // Enter empty URL
       await tester.enterText(urlField, '');
@@ -230,7 +230,7 @@ void main() {
       await tester.tap(testBtnFinder);
       await tester.pumpAndSettle();
 
-      expect(find.text('Informe o endereço do daemon'), findsOneWidget);
+      expect(find.text('Enter the daemon address'), findsOneWidget);
     });
 
     testWidgets('Renders Android helper text on Android', (tester) async {
@@ -244,7 +244,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.textContaining('No Android, localhost refere-se ao próprio dispositivo'),
+        find.textContaining('On Android, localhost refers to the device itself'),
         findsOneWidget,
       );
     });

@@ -15,7 +15,7 @@ import 'daemon_setup_screen.dart';
 ///    even if the daemon is offline (the existing offline banner handles that).
 /// 2. `settings.hasConfirmedConnection == false` -> [DaemonSetupScreen] on every platform.
 ///    First run always configures; no silent auto-confirm, no timeout race.
-/// 3. "Continuar offline" -> [AppNavigationShell] as gate-local bypass state without
+/// 3. "Continue offline" -> [AppNavigationShell] as gate-local bypass state without
 ///    marking connection confirmed in persistent settings.
 class ConnectionGate extends ConsumerStatefulWidget {
   final Widget? shellOverride;

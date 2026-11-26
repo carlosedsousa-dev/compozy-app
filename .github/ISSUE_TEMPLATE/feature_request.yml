@@ -1,0 +1,57 @@
+name: Feature Request
+description: Suggest an improvement or capability for the CompozyOS Flutter client
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > **Beta notice:** `compozy-app` is early **beta** software. The daemon API surface and mobile/desktop UI are actively evolving and may change without notice. Proposals should align with a read-mostly local daemon client.
+  - type: input
+    id: app_version
+    attributes:
+      label: App version
+      description: Version from pubspec.yaml or commit SHA
+      placeholder: "0.1.0+1"
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Target platform
+      options:
+        - All platforms
+        - Android
+        - Desktop (Linux / macOS / Windows)
+        - Web
+    validations:
+      required: true
+  - type: input
+    id: daemon_version
+    attributes:
+      label: CompozyOS daemon version
+      description: Daemon version you are targeting or testing against
+      placeholder: "e.g. 0.x.y or N/A"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Context / Workflow steps
+      description: Describe the workflow or use case where this capability is needed.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior / Proposed solution
+      description: Describe what you would like the client to do.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Current behavior / Workaround
+      description: What happens today or how you work around the gap.
+    validations:
+      required: true
