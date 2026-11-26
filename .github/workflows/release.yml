@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -27,31 +27,49 @@ jobs:
       contents: read
     outputs:
       version: ${{ steps.check.outputs.version }}
+      sha: ${{ steps.check.outputs.sha }}
 
     steps:
-      - name: Checkout tag
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
 
-      - name: Validate tag against pubspec.yaml and kAppVersion
+      - name: Validate tag, ancestry, changelog, and release uniqueness
         id: check
         env:
           EVENT_NAME: ${{ github.event_name }}
           INPUT_TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            RAW_TAG="$INPUT_TAG"
+          if [ "${EVENT_NAME:-}" = "workflow_dispatch" ]; then
+            RAW_TAG="${INPUT_TAG:-}"
           else
-            RAW_TAG="$GITHUB_REF_NAME"
+            RAW_TAG="${GITHUB_REF_NAME:-}"
           fi
 
           VERSION="${RAW_TAG#v}"
-          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Error: Tag '$RAW_TAG' (resolved version '$VERSION') must be an exact X.Y.Z SemVer tag (pre-release suffixes are not supported in v1)." >&2
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Error: Tag '$RAW_TAG' (resolved version '$VERSION') must match SemVer X.Y.Z or X.Y.Z-<prerelease>." >&2
             exit 1
           fi
+
+          git fetch --tags --force origin
+          if ! git show-ref --verify --quiet "refs/tags/v${VERSION}"; then
+            echo "Error: Tag 'v${VERSION}' does not exist locally or on origin. Create and push the annotated tag first (git tag -a v${VERSION} -m \"Release v${VERSION}\" && git push origin v${VERSION})." >&2
+            exit 1
+          fi
+
+          TAG_TYPE=$(git cat-file -t "refs/tags/v${VERSION}")
+          if [ "$TAG_TYPE" != "tag" ]; then
+            echo "Error: Tag 'v${VERSION}' is '${TAG_TYPE}', not an annotated tag. Recreate it with 'git tag -a v${VERSION} -m \"Release v${VERSION}\"'." >&2
+            exit 1
+          fi
+
+          git checkout --detach "refs/tags/v${VERSION}"
+          SHA=$(git rev-parse HEAD)
 
           PUBSPEC_VERSION=$(sed -n 's/^version:[[:space:]]*\([^+#[:space:]]*\).*/\1/p' pubspec.yaml | head -n1)
           APP_VERSION=$(sed -n "s/^const String kAppVersion = ['\"]\([^'\"]*\)['\"];.*/\1/p" lib/core/app_info.dart | head -n1)
@@ -61,8 +79,31 @@ jobs:
             exit 1
           fi
 
-          echo "Version guard passed: $VERSION"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if ! VERSION="$VERSION" python3 -c '
+          import os, pathlib, re, sys
+          version = os.environ["VERSION"]
+          text = pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8")
+          sys.exit(0 if re.search(rf"^## \[{re.escape(version)}\](?:[ \t]|$)", text, re.MULTILINE) else 1)
+          '; then
+            echo "Error: CHANGELOG.md does not contain a heading '## [${VERSION}]'." >&2
+            exit 1
+          fi
+
+          if ! git merge-base --is-ancestor "$SHA" origin/main; then
+            echo "Error: Tagged commit '$SHA' (v${VERSION}) is not an ancestor of origin/main." >&2
+            exit 1
+          fi
+
+          if gh release view "v${VERSION}" >/dev/null 2>&1; then
+            echo "Error: GitHub release 'v${VERSION}' already exists." >&2
+            exit 1
+          fi
+
+          echo "Version guard passed: v${VERSION} (${SHA})"
+          {
+            echo "version=${VERSION}"
+            echo "sha=${SHA}"
+          } >> "$GITHUB_OUTPUT"
 
   verify:
     name: Analyze & Test
@@ -71,10 +112,11 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - name: Checkout tag
+      - name: Checkout validated commit
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: ${{ needs.guard.outputs.sha }}
+          fetch-depth: 1
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -98,10 +140,11 @@ jobs:
     timeout-minutes: 25
 
     steps:
-      - name: Checkout tag
+      - name: Checkout validated commit
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: ${{ needs.guard.outputs.sha }}
+          fetch-depth: 1
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -113,7 +156,7 @@ jobs:
         run: flutter pub get
 
       - name: Build Android APK (release)
-        run: flutter build apk --release
+        run: flutter build apk --release --build-number ${{ github.run_number }}
 
       - name: Build Web bundle (release)
         run: flutter build web --release
@@ -150,10 +193,11 @@ jobs:
       contents: write
 
     steps:
-      - name: Checkout tag
+      - name: Checkout validated commit
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: ${{ needs.guard.outputs.sha }}
+          fetch-depth: 1
 
       - name: Download release artifacts
         uses: actions/download-artifact@v4
@@ -190,7 +234,7 @@ jobs:
         run: |
           set -euo pipefail
           PRERELEASE_FLAG=()
-          if [[ "$VERSION" == 0.* ]]; then
+          if [[ "$VERSION" == *-* ]]; then
             PRERELEASE_FLAG+=(--prerelease)
           fi
           gh release create "v${VERSION}" \

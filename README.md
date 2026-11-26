@@ -121,8 +121,8 @@ Current baseline: `flutter analyze` reports **0 issues** and `flutter test` pass
 
 ## CI/CD
 
-- **CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)):** Runs `flutter analyze` and `flutter test --reporter expanded` on every push and pull request targeting `main`.
-- **Release CD ([`.github/workflows/release.yml`](.github/workflows/release.yml)):** Triggers on annotated `vX.Y.Z` tags (or manual `workflow_dispatch` with an existing tag). It runs a version guard checking that the tag matches `pubspec.yaml` and `kAppVersion`, re-runs static analysis and tests, builds the release Android APK and web bundle (`zip`), and publishes a GitHub Release with notes extracted from [`CHANGELOG.md`](CHANGELOG.md). The Android APK is currently debug-signed (beta) until a release keystore secret is configured.
+- **CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)):** Runs `flutter analyze` and `flutter test --reporter expanded` on every push and pull request targeting `main`, and builds the release web bundle (`flutter build web --release`).
+- **Release CD ([`.github/workflows/release.yml`](.github/workflows/release.yml)):** Triggers on annotated `vX.Y.Z` or pre-release `vX.Y.Z-<suffix>` tags (or manual `workflow_dispatch` with an existing tag). It runs a guard verifying the annotated tag, `main` ancestry, `pubspec.yaml` / `kAppVersion`, and [`CHANGELOG.md`](CHANGELOG.md) heading, re-runs static analysis and tests, builds the release Android APK and web bundle (`zip`), and publishes a GitHub Release (marked as a pre-release for `-<suffix>` tags) with notes extracted from [`CHANGELOG.md`](CHANGELOG.md). The Android APK is currently debug-signed (beta) until a release keystore secret is configured.
 
 ## Contributing
 

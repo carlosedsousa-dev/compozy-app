@@ -33,3 +33,25 @@ jobs:
 
       - name: Run test suite
         run: flutter test --reporter expanded
+
+  web-build:
+    name: Build Web (release)
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Web bundle (release)
+        run: flutter build web --release

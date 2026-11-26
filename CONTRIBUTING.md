@@ -27,14 +27,14 @@ flutter test
 - **Bump in the same PR:** Update the version in both `pubspec.yaml` and `lib/core/app_info.dart` in the same PR as the change, following the pre-1.0 SemVer rules in [`README.md#versioning`](README.md#versioning).
 - **Update the changelog:** Add an entry under `## [Unreleased]` in [`CHANGELOG.md`](CHANGELOG.md) for every user-visible change.
 - **Docs/CI-only exception:** Documentation-only or CI-only PRs may skip the version bump, but must explicitly state why in the PR description.
-- **Do not edit build metadata:** Never hand-edit the `+N` build number in `pubspec.yaml`; it is reserved for CI and store builds.
+- **Build metadata (`+N`):** The `+N` build number in `pubspec.yaml` applies only to local builds; CI release builds override the Android `versionCode` with the GitHub Actions run number.
 
 ### Releasing
 
-1. Bump the version in `pubspec.yaml` and `kAppVersion` in [`lib/core/app_info.dart`](lib/core/app_info.dart), and move [`CHANGELOG.md`](CHANGELOG.md) entries from `## [Unreleased]` to `## [X.Y.Z]` in a single PR.
-2. After the PR merges, create an annotated tag on `main` (`git tag -a vX.Y.Z -m "Release vX.Y.Z"`) and push it (`git push origin vX.Y.Z`).
-3. [`.github/workflows/release.yml`](.github/workflows/release.yml) validates the tag, runs `flutter analyze` and `flutter test`, builds the artifacts, and publishes the GitHub Release.
-4. **Limitations & tag immutability:** Until a release keystore secret is configured, the Android APK is debug-signed. Release tags are immutable and must never be moved or deleted once pushed.
+1. Bump the version in `pubspec.yaml` and `kAppVersion` in [`lib/core/app_info.dart`](lib/core/app_info.dart), and move [`CHANGELOG.md`](CHANGELOG.md) entries from `## [Unreleased]` to `## [X.Y.Z]` (or `## [X.Y.Z-suffix]` for a pre-release) in a single PR. [`CHANGELOG.md`](CHANGELOG.md) must contain that exact heading before tagging — the release workflow fails without it.
+2. After the PR merges to `main`, create an annotated tag (`git tag -a vX.Y.Z -m "Release vX.Y.Z"` or `vX.Y.Z-<suffix>`) on a commit reachable from `main` and push it (`git push origin vX.Y.Z`). Lightweight tags and tags pointing outside `main` are refused by the workflow.
+3. [`.github/workflows/release.yml`](.github/workflows/release.yml) validates the tag and commit, runs `flutter analyze` and `flutter test`, builds the artifacts (setting the Android `versionCode` to the CI run number rather than `+N` from `pubspec.yaml`, which is only for local builds), and publishes the GitHub Release. A `vX.Y.Z-<suffix>` tag publishes a GitHub pre-release; a plain `vX.Y.Z` tag publishes a normal release.
+4. **Limitations & patch-forward rollback:** Until a release keystore secret is configured, the Android APK is debug-signed. Release tags are immutable and must never be moved or deleted once pushed; rollback is patch-forward only (fix the issue and publish the next patch version).
 
 ## Guidelines
 
