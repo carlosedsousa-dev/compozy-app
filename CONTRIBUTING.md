@@ -29,6 +29,13 @@ flutter test
 - **Docs/CI-only exception:** Documentation-only or CI-only PRs may skip the version bump, but must explicitly state why in the PR description.
 - **Do not edit build metadata:** Never hand-edit the `+N` build number in `pubspec.yaml`; it is reserved for CI and store builds.
 
+### Releasing
+
+1. Bump the version in `pubspec.yaml` and `kAppVersion` in [`lib/core/app_info.dart`](lib/core/app_info.dart), and move [`CHANGELOG.md`](CHANGELOG.md) entries from `## [Unreleased]` to `## [X.Y.Z]` in a single PR.
+2. After the PR merges, create an annotated tag on `main` (`git tag -a vX.Y.Z -m "Release vX.Y.Z"`) and push it (`git push origin vX.Y.Z`).
+3. [`.github/workflows/release.yml`](.github/workflows/release.yml) validates the tag, runs `flutter analyze` and `flutter test`, builds the artifacts, and publishes the GitHub Release.
+4. **Limitations & tag immutability:** Until a release keystore secret is configured, the Android APK is debug-signed. Release tags are immutable and must never be moved or deleted once pushed.
+
 ## Guidelines
 
 - **Keep changes scoped:** Focus each pull request on a single bug fix, feature, or documentation improvement. Avoid unrelated refactoring.

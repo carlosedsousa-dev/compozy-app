@@ -1,0 +1,201 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing git tag to release (e.g. v0.1.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    name: Version Guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Validate tag against pubspec.yaml and kAppVersion
+        id: check
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            RAW_TAG="$INPUT_TAG"
+          else
+            RAW_TAG="$GITHUB_REF_NAME"
+          fi
+
+          VERSION="${RAW_TAG#v}"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: Tag '$RAW_TAG' (resolved version '$VERSION') must be an exact X.Y.Z SemVer tag (pre-release suffixes are not supported in v1)." >&2
+            exit 1
+          fi
+
+          PUBSPEC_VERSION=$(sed -n 's/^version:[[:space:]]*\([^+#[:space:]]*\).*/\1/p' pubspec.yaml | head -n1)
+          APP_VERSION=$(sed -n "s/^const String kAppVersion = ['\"]\([^'\"]*\)['\"];.*/\1/p" lib/core/app_info.dart | head -n1)
+
+          if [ "$VERSION" != "$PUBSPEC_VERSION" ] || [ "$VERSION" != "$APP_VERSION" ]; then
+            echo "Error: Version mismatch — tag='$VERSION', pubspec.yaml='$PUBSPEC_VERSION', kAppVersion='$APP_VERSION'." >&2
+            exit 1
+          fi
+
+          echo "Version guard passed: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+  verify:
+    name: Analyze & Test
+    needs: guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run static analysis
+        run: flutter analyze
+
+      - name: Run test suite
+        run: flutter test --reporter expanded
+
+  build:
+    name: Build Release Artifacts
+    needs: [guard, verify]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Android APK (release)
+        run: flutter build apk --release
+
+      - name: Build Web bundle (release)
+        run: flutter build web --release
+
+      - name: Package release artifacts
+        env:
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-release.apk "dist/compozy-app-${VERSION}-android.apk"
+          (cd build/web && zip -r "../../dist/compozy-app-${VERSION}-web.zip" .)
+
+      - name: Upload Android APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: compozy-app-android
+          path: dist/compozy-app-${{ needs.guard.outputs.version }}-android.apk
+          if-no-files-found: error
+
+      - name: Upload Web bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: compozy-app-web
+          path: dist/compozy-app-${{ needs.guard.outputs.version }}-web.zip
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
+    needs: [guard, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Extract release notes from CHANGELOG.md
+        env:
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import pathlib
+          import re
+
+          version = os.environ["VERSION"]
+          changelog = pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8")
+          pattern = re.compile(
+              rf"^## \[{re.escape(version)}\][^\n]*\n(.*?)(?=^## |\Z)",
+              re.MULTILINE | re.DOTALL,
+          )
+          match = pattern.search(changelog)
+          notes = match.group(1).strip() if match else ""
+          if not notes:
+              notes = "See CHANGELOG.md"
+          pathlib.Path("dist/release-notes.md").write_text(notes + "\n", encoding="utf-8")
+          PY
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          PRERELEASE_FLAG=()
+          if [[ "$VERSION" == 0.* ]]; then
+            PRERELEASE_FLAG+=(--prerelease)
+          fi
+          gh release create "v${VERSION}" \
+            "dist/compozy-app-${VERSION}-android.apk" \
+            "dist/compozy-app-${VERSION}-web.zip" \
+            --title "v${VERSION} (beta)" \
+            --notes-file dist/release-notes.md \
+            "${PRERELEASE_FLAG[@]}"

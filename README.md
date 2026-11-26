@@ -5,7 +5,7 @@ Flutter client for a local [CompozyOS](https://github.com/compozy) daemon — se
 [![Status: Beta](https://img.shields.io/badge/status-beta-orange.svg)](#)
 [![Flutter](https://img.shields.io/badge/Flutter-stable-02569B.svg?logo=flutter&logoColor=white)](https://flutter.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![CI](https://github.com/<owner>/<repo>/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
+[![CI](https://github.com/carlosedsousa-dev/compozy-app/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
 
 > **Beta software:** `compozy-app` is an early **beta** client for a local CompozyOS daemon. The daemon API surface, navigation, and UI are actively evolving and may change without notice.
 
@@ -47,7 +47,7 @@ Flutter client for a local [CompozyOS](https://github.com/compozy) daemon — se
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/<owner>/<repo>.git
+   git clone https://github.com/carlosedsousa-dev/compozy-app.git
    cd compozy-app
    ```
 
@@ -117,7 +117,12 @@ flutter analyze
 flutter test
 ```
 
-Current baseline: `flutter analyze` reports **0 issues** and `flutter test` passes **239 tests**, including end-to-end widget flows in [`test/e2e/live_flow_test.dart`](test/e2e/live_flow_test.dart) and [`test/e2e/live_flow_v2_test.dart`](test/e2e/live_flow_v2_test.dart) (mocked HTTP/SSE daemon journeys covering connection setup, sessions, live streaming chat, approvals, subagent drawer, Loops execution, settings, and theme switching).
+Current baseline: `flutter analyze` reports **0 issues** and `flutter test` passes **241 tests**, including end-to-end widget flows in [`test/e2e/live_flow_test.dart`](test/e2e/live_flow_test.dart) and [`test/e2e/live_flow_v2_test.dart`](test/e2e/live_flow_v2_test.dart) (mocked HTTP/SSE daemon journeys covering connection setup, sessions, live streaming chat, approvals, subagent drawer, Loops execution, settings, and theme switching).
+
+## CI/CD
+
+- **CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)):** Runs `flutter analyze` and `flutter test --reporter expanded` on every push and pull request targeting `main`.
+- **Release CD ([`.github/workflows/release.yml`](.github/workflows/release.yml)):** Triggers on annotated `vX.Y.Z` tags (or manual `workflow_dispatch` with an existing tag). It runs a version guard checking that the tag matches `pubspec.yaml` and `kAppVersion`, re-runs static analysis and tests, builds the release Android APK and web bundle (`zip`), and publishes a GitHub Release with notes extracted from [`CHANGELOG.md`](CHANGELOG.md). The Android APK is currently debug-signed (beta) until a release keystore secret is configured.
 
 ## Contributing
 
