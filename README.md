@@ -127,6 +127,16 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for prerequisites, the required verific
 
 See [`SECURITY.md`](SECURITY.md) for private vulnerability reporting instructions and security scope notes.
 
+## Versioning
+
+`compozy-app` follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html). The authoritative package version lives in `pubspec.yaml` and is mirrored in [`lib/core/app_info.dart`](lib/core/app_info.dart) (enforced by [`test/core/version_test.dart`](test/core/version_test.dart)).
+
+- **Pre-1.0 rules:** While `MAJOR` is `0`, **breaking** changes and new features bump `MINOR` (`0.1.0` -> `0.2.0`), and fixes bump `PATCH`. Once `1.0.0` is released, standard SemVer (`MAJOR.MINOR.PATCH`) applies.
+- **Release tags & build metadata:** Releases use annotated git tags `vX.Y.Z` matching the package version. The `+N` build suffix in `pubspec.yaml` is metadata for CI/store builds and must never be used to compare compatibility.
+- **Daemon independence:** The client is versioned independently of the CompozyOS daemon and does not mirror daemon versions. Compatibility is defined by [API Surface Consumed](#api-surface-consumed); daemon-side changes that break that surface are treated as breaking changes here.
+- **Deprecations:** A `MINOR` release may deprecate an API or UI surface; removal happens no earlier than the next `MINOR` pre-1.0 (`MAJOR` after `1.0`).
+- **Reporting issues:** Check the version in **Settings -> About** (or include the git tag/build you ran) when filing bug reports.
+
 ## License
 
 Released under the [MIT License](LICENSE).

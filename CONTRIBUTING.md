@@ -22,6 +22,13 @@ flutter analyze
 flutter test
 ```
 
+## Versioning
+
+- **Bump in the same PR:** Update the version in both `pubspec.yaml` and `lib/core/app_info.dart` in the same PR as the change, following the pre-1.0 SemVer rules in [`README.md#versioning`](README.md#versioning).
+- **Update the changelog:** Add an entry under `## [Unreleased]` in [`CHANGELOG.md`](CHANGELOG.md) for every user-visible change.
+- **Docs/CI-only exception:** Documentation-only or CI-only PRs may skip the version bump, but must explicitly state why in the PR description.
+- **Do not edit build metadata:** Never hand-edit the `+N` build number in `pubspec.yaml`; it is reserved for CI and store builds.
+
 ## Guidelines
 
 - **Keep changes scoped:** Focus each pull request on a single bug fix, feature, or documentation improvement. Avoid unrelated refactoring.

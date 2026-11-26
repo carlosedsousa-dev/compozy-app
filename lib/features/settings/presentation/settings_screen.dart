@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../../core/app_info.dart';
 import '../../../core/network/compozy_api_client.dart';
 import '../../../core/network/health_checker.dart';
 import '../../../core/presentation/compozy_feedback.dart';
@@ -377,6 +378,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       _buildThemeCard(context),
                       const SizedBox(height: 20),
                       _buildActions(context),
+                      const SizedBox(height: 24),
+                      _buildAboutSection(context),
                       const SizedBox(height: 24),
                     ],
                   ),
@@ -1056,6 +1059,49 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildAboutSection(BuildContext context) {
+    final palette = context.palette;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: palette.card,
+        borderRadius: CompozyRadius.card,
+        border: Border.all(color: palette.line, width: 1),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Semantics(
+            header: true,
+            child: Text(
+              'About',
+              style: TextStyle(
+                color: palette.muted,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              'compozy-app v$kAppVersion · $kAppStage',
+              key: const Key('settings_about_version'),
+              textAlign: TextAlign.end,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: palette.muted,
+                fontSize: 12,
+                fontFamily: 'monospace',
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

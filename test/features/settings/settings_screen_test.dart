@@ -505,5 +505,35 @@ void main() {
       expect(find.byKey(const Key('connection_test_success_banner')), findsOneWidget);
       expect(find.text('Daemon is reachable (HTTP 200 OK)'), findsWidgets);
     });
+
+    testWidgets('renders About footer with app version and beta stage', (tester) async {
+      final repo = _InMemorySettingsRepository();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            settingsRepositoryProvider.overrideWithValue(repo),
+            settingsProvider.overrideWith((ref) => SettingsNotifier(repo)),
+            connectionStatusProvider.overrideWith((ref) => Future.value(true)),
+          ],
+          child: MaterialApp(
+            theme: CompozyTheme.darkTheme,
+            home: const SettingsScreen(),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final aboutFinder = find.byKey(const Key('settings_about_version'));
+      await tester.ensureVisible(aboutFinder);
+      await tester.pumpAndSettle();
+
+      expect(find.text('About'), findsOneWidget);
+      expect(aboutFinder, findsOneWidget);
+      final aboutText = tester.widget<Text>(aboutFinder).data;
+      expect(aboutText, contains('v0.1.0'));
+      expect(aboutText, contains('beta'));
+    });
   });
 }
