@@ -155,8 +155,54 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Configure Android signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ANDROID_KEYSTORE_BASE64:-}" ] || [ -z "${ANDROID_KEYSTORE_PASSWORD:-}" ] || [ -z "${ANDROID_KEY_ALIAS:-}" ] || [ -z "${ANDROID_KEY_PASSWORD:-}" ]; then
+            echo "Error: Missing Android signing secret(s); refusing to publish an unsigned or debug-signed APK." >&2
+            exit 1
+          fi
+          umask 077
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > android/app/release.keystore
+          {
+            printf 'storePassword=%s\n' "$ANDROID_KEYSTORE_PASSWORD"
+            printf 'keyPassword=%s\n' "$ANDROID_KEY_PASSWORD"
+            printf 'keyAlias=%s\n' "$ANDROID_KEY_ALIAS"
+            printf 'storeFile=release.keystore\n'
+          } > android/key.properties
+
       - name: Build Android APK (release)
         run: flutter build apk --release --build-number ${{ github.run_number }}
+
+      - name: Verify APK signature
+        run: |
+          set -euo pipefail
+          SDK_DIR="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          if [ -z "$SDK_DIR" ] || [ ! -d "$SDK_DIR/build-tools" ]; then
+            echo "Error: Android SDK build-tools directory not found (ANDROID_SDK_ROOT/ANDROID_HOME unset or missing)." >&2
+            exit 1
+          fi
+          shopt -s nullglob
+          CANDIDATES=("$SDK_DIR"/build-tools/*/apksigner)
+          APKSIGNER=""
+          if [ "${#CANDIDATES[@]}" -gt 0 ]; then
+            APKSIGNER=$(printf '%s\n' "${CANDIDATES[@]}" | sort -V | tail -n 1)
+          fi
+          if [ -z "$APKSIGNER" ] || [ ! -x "$APKSIGNER" ]; then
+            echo "Error: apksigner not found under '$SDK_DIR/build-tools/*/apksigner'." >&2
+            exit 1
+          fi
+          CERT_OUTPUT=$("$APKSIGNER" verify --print-certs build/app/outputs/flutter-apk/app-release.apk)
+          echo "$CERT_OUTPUT"
+          if ! grep -Fq "CN=Compozy" <<< "$CERT_OUTPUT"; then
+            echo "Error: APK is not signed with the expected release certificate (CN=Compozy missing)." >&2
+            exit 1
+          fi
 
       - name: Build Web bundle (release)
         run: flutter build web --release
@@ -183,6 +229,10 @@ jobs:
           name: compozy-app-web
           path: dist/compozy-app-${{ needs.guard.outputs.version }}-web.zip
           if-no-files-found: error
+
+      - name: Remove signing material
+        if: always()
+        run: rm -f android/key.properties android/app/release.keystore
 
   publish:
     name: Publish GitHub Release
